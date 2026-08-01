@@ -12,7 +12,18 @@
 #ifndef _MY_VERSION_H_
 #define _MY_VERSION_H_
 
-#define SOFTWARE_VERSION "LL320D_EM01_NRF54L15_V1.0_260731"
+#define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260731"
+/* 软件版本:        V1.0
+** 完成日期:        2026.07.31
+** 作    者:       周森达 (zhousenda@jimiiot.com)
+** 修改内容:        新增QMI8658B六轴IMU驱动模块
+**                 1.新增QMI8658B寄存器驱动，支持初始化、数据采集、量程/ODR/LPF/电源配置及寄存器访问；
+**                 2.新增Zephyr I2C和INT1 GPIO端口适配，支持中断回调与FIFO数据处理；
+**                 3.新增统一imu_api 应用接口，支持六轴数据换算、运动检测、模式切换、同步采样、校准及自检；
+**                 4.新增模块使用说明文档；
+***/
+
+// #define SOFTWARE_VERSION "LL320D_EM01_NRF54L15_V1.0_260731"
 /* 软件版本:        V1.0
 ** 完成日期:        2026.07.31
 ** 作    者:       曹阳 (caoyang@jimiiot.com)
