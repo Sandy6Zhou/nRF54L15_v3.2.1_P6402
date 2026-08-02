@@ -11,7 +11,7 @@ static k_tid_t s_my_main_task_id = NULL;
 static k_tid_t s_my_ble_task_id = NULL;
 static k_tid_t s_my_ctrl_task_id = NULL;
 static k_tid_t s_my_lte_task_id = NULL;
-static k_tid_t s_my_magnetic_uart_task_id = NULL;
+static k_tid_t s_my_wifi_uart_task_id = NULL;
 static k_tid_t s_my_gsensor_task_id = NULL;
 
 static k_tid_t s_my_task_info[MAX_MY_MOD_TYPE] = {NULL};
@@ -70,7 +70,7 @@ void custom_task_info_init(void)
     s_my_task_info[MOD_BLE] = s_my_ble_task_id;
     s_my_task_info[MOD_CTRL] = s_my_ctrl_task_id;
     s_my_task_info[MOD_LTE] = s_my_lte_task_id;
-    s_my_task_info[MOD_MAGNETIC_UART] = s_my_magnetic_uart_task_id;
+    s_my_task_info[MOD_WIFI_UART] = s_my_wifi_uart_task_id;
     s_my_task_info[MOD_GSENSOR] = s_my_gsensor_task_id;
 }
 
@@ -457,11 +457,11 @@ int main(void)
         /* LTE 初始化失败可以选择不进入 error() 阻塞，视具体需求而定 */
     }
 
-    /* 初始化磁吸串口模块 */
-    err = my_magnetic_uart_init(&s_my_magnetic_uart_task_id);
+    /* 初始化 WIFI 串口模块 */
+    err = my_wifi_uart_init(&s_my_wifi_uart_task_id);
     if (err)
     {
-        MY_LOG_ERR("Failed to initialize Magnetic UART module (err %d)", err);
+        MY_LOG_ERR("Failed to initialize WIFI UART module (err %d)", err);
     }
 
     /* 初始化 G-Sensor 模块 */
@@ -469,6 +469,13 @@ int main(void)
     if (err)
     {
         MY_LOG_ERR("Failed to initialize G-Sensor (err %d)", err);
+    }
+
+    /* 初始化 LCD 显示屏 */
+    err = my_lcd_init();
+    if (err)
+    {
+        MY_LOG_ERR("Failed to initialize LCD (err %d)", err);
     }
 
     /* 初始化自定义任务信息 */
@@ -519,6 +526,14 @@ int main(void)
                     go_to_shutdown();
                 }
                 MY_LOG_INF("KEY EVENT: Long press detected (3s)");
+                break;
+
+            case MY_MSG_CTRL_SOS_SHORT_PRESS:
+                MY_LOG_INF("SOS KEY EVENT: Short press detected");
+                break;
+
+            case MY_MSG_CTRL_SOS_LONG_PRESS:
+                MY_LOG_INF("SOS KEY EVENT: Long press detected (3s)");
                 break;
 
             case MY_MSG_CTRL_SHUTDOWN_REQUEST:

@@ -41,21 +41,6 @@ typedef struct {
     uint8_t state;     // 0=关，1=开
 } buzzer_ctrl_t;
 
-typedef enum
-{
-    CLOSE_LED,   /* 关闭 LED */
-    OPEN_LED,    /* 打开 LED */
-    TOGGLE_LED,  /* 切换 LED 状态 */
-} my_led_ctrl_cmd_t;
-
-//定义了电池相关 LED ID，用于标识不同的 LED 指示灯
-typedef enum
-{
-    BATT_LED1,  /**< 电池 LED 1 */
-    BATT_LED2,  /**< 电池 LED 2 */
-    BATT_LED3,  /**< 电池 LED 3 */
-} my_led_id_t;
-
 /* --- 接口函数 --- */
 
 /********************************************************************
@@ -94,15 +79,19 @@ int my_ctrl_buzzer_play_sequence(const struct my_buzzer_note *notes, uint32_t nu
 **函数名称:  batt_led_set_level
 **入口参数:  level    ---   电量等级 (0~3)
 **出口参数:  无
-**函数功能:  设置电量指示灯等级
-**返 回 值:  0 表示成功，负值表示失败
-**功能描述:  根据 level 值点亮对应数量的电量 LED
-**           0 -> 全灭
-**           1 -> 只亮 batt_led0
-**           2 -> 亮 batt_led0, batt_led1
-**           3 -> 亮 batt_led0, batt_led1, batt_led2
+**函数功能:  设置电量指示灯等级（电量LED已删除，当前为空实现）
+**返 回 值:  0 表示成功
 *********************************************************************/
 int batt_led_set_level(uint8_t level);
+
+/********************************************************************
+**函数名称:  barometer_pwr_on
+**入口参数:  on       ---        true 开启，false 关闭（输入）
+**出口参数:  无
+**函数功能:  控制气压传感器供电（P2.09，高电平使能）
+**返回值:    0 表示成功，负值表示失败
+*********************************************************************/
+int barometer_pwr_on(bool on);
 
 /**
 ********************************************************************

@@ -40,7 +40,7 @@ LOG_MODULE_REGISTER(my_pm, LOG_LEVEL_INF);
 #define LTE_UART_NODE DT_ALIAS(lte_uart)
 
 /* ========== 磁吸 UART20 总线设备节点 ========== */
-#define MAGNETIC_UART_NODE DT_ALIAS(magnetic_uart)
+#define WIFI_UART_NODE DT_ALIAS(wifi_uart)
 
 /* ========== Battery ADC 设备节点 ========== */
 #define BATTERY_ADC_NODE DT_PATH(zephyr_user)
@@ -138,15 +138,15 @@ static const struct device *my_pm_get_lte_uart_device(void)
 }
 
 /********************************************************************
-**函数名称:  my_pm_get_magnetic_uart_device
+**函数名称:  my_pm_get_wifi_uart_device
 **入口参数:  无
 **出口参数:  无
 **函数功能:  获取磁吸 UART 设备句柄
 **返 回 值:  UART 设备指针，未就绪返回 NULL
 *********************************************************************/
-static const struct device *my_pm_get_magnetic_uart_device(void)
+static const struct device *my_pm_get_wifi_uart_device(void)
 {
-    const struct device *dev = DEVICE_DT_GET_OR_NULL(MAGNETIC_UART_NODE);
+    const struct device *dev = DEVICE_DT_GET_OR_NULL(WIFI_UART_NODE);
     return dev;
 }
 
@@ -209,60 +209,60 @@ static int my_pm_lte_uart_suspend(void)
 }
 
 /********************************************************************
-**函数名称:  my_pm_magnetic_uart_resume
+**函数名称:  my_pm_wifi_uart_resume
 **入口参数:  无
 **出口参数:  无
 **函数功能:  恢复磁吸 UART 总线（使用 Runtime PM API）
 **返 回 值:  0 表示成功，负值表示错误码
 *********************************************************************/
-static int my_pm_magnetic_uart_resume(void)
+static int my_pm_wifi_uart_resume(void)
 {
-    const struct device *dev = my_pm_get_magnetic_uart_device();
+    const struct device *dev = my_pm_get_wifi_uart_device();
     int ret = 0;
 
     if (dev == NULL)
     {
-        MY_LOG_ERR("Magnetic UART device not found");
+        MY_LOG_ERR("WIFI UART device not found");
         return -ENODEV;
     }
 
     ret = pm_device_runtime_get(dev);
     if (ret < 0)
     {
-        MY_LOG_ERR("Magnetic UART runtime get failed: %d", ret);
+        MY_LOG_ERR("WIFI UART runtime get failed: %d", ret);
         return ret;
     }
 
-    MY_LOG_DBG("Magnetic UART runtime get OK");
+    MY_LOG_DBG("WIFI UART runtime get OK");
     return 0;
 }
 
 /********************************************************************
-**函数名称:  my_pm_magnetic_uart_suspend
+**函数名称:  my_pm_wifi_uart_suspend
 **入口参数:  无
 **出口参数:  无
 **函数功能:  挂起磁吸 UART 总线（使用 Runtime PM API）
 **返 回 值:  0 表示成功，负值表示错误码
 *********************************************************************/
-static int my_pm_magnetic_uart_suspend(void)
+static int my_pm_wifi_uart_suspend(void)
 {
-    const struct device *dev = my_pm_get_magnetic_uart_device();
+    const struct device *dev = my_pm_get_wifi_uart_device();
     int ret = 0;
 
     if (dev == NULL)
     {
-        MY_LOG_ERR("Magnetic UART device not found");
+        MY_LOG_ERR("WIFI UART device not found");
         return -ENODEV;
     }
 
     ret = pm_device_runtime_put(dev);
     if (ret < 0)
     {
-        MY_LOG_ERR("Magnetic UART runtime put failed: %d", ret);
+        MY_LOG_ERR("WIFI UART runtime put failed: %d", ret);
         return ret;
     }
 
-    MY_LOG_DBG("Magnetic UART runtime put OK");
+    MY_LOG_DBG("WIFI UART runtime put OK");
     return 0;
 }
 
@@ -466,8 +466,8 @@ int my_pm_device_register(my_pm_dev_id_t dev_id, const pm_device_ops_t *ops)
                 ret = my_pm_lte_uart_resume();
                 break;
 
-            case MY_PM_DEV_MAGNETIC_UART:
-                ret = my_pm_magnetic_uart_resume();
+            case MY_PM_DEV_WIFI_UART:
+                ret = my_pm_wifi_uart_resume();
                 break;
 
             case MY_PM_DEV_BATTERY:
@@ -500,8 +500,8 @@ int my_pm_device_register(my_pm_dev_id_t dev_id, const pm_device_ops_t *ops)
                 ret = my_pm_lte_uart_suspend();
                 break;
 
-            case MY_PM_DEV_MAGNETIC_UART:
-                ret = my_pm_magnetic_uart_suspend();
+            case MY_PM_DEV_WIFI_UART:
+                ret = my_pm_wifi_uart_suspend();
                 break;
 
             case MY_PM_DEV_BATTERY:
@@ -589,8 +589,8 @@ int my_pm_device_resume(my_pm_dev_id_t dev_id)
             ret = my_pm_lte_uart_resume();
             break;
 
-        case MY_PM_DEV_MAGNETIC_UART:
-            ret = my_pm_magnetic_uart_resume();
+        case MY_PM_DEV_WIFI_UART:
+            ret = my_pm_wifi_uart_resume();
             break;
 
         case MY_PM_DEV_BATTERY:
@@ -632,8 +632,8 @@ int my_pm_device_resume(my_pm_dev_id_t dev_id)
                     ret = my_pm_lte_uart_suspend();
                     break;
 
-                case MY_PM_DEV_MAGNETIC_UART:
-                    ret = my_pm_magnetic_uart_suspend();
+                case MY_PM_DEV_WIFI_UART:
+                    ret = my_pm_wifi_uart_suspend();
                     break;
 
                 case MY_PM_DEV_PWM:
@@ -721,8 +721,8 @@ int my_pm_device_suspend(my_pm_dev_id_t dev_id)
             ret = my_pm_lte_uart_suspend();
             break;
 
-        case MY_PM_DEV_MAGNETIC_UART:
-            ret = my_pm_magnetic_uart_suspend();
+        case MY_PM_DEV_WIFI_UART:
+            ret = my_pm_wifi_uart_suspend();
             break;
 
         case MY_PM_DEV_BATTERY:

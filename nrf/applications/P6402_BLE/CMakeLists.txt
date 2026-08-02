@@ -14,11 +14,9 @@ target_include_directories(app PRIVATE
  ./ext_module/QMI8658B/api
  ./ext_module/QMI8658B/port
  ./ext_module/QMI8658B/driver
-#  ./ext_module/battery_gauge/api
-#  ./ext_module/battery_gauge/port
-#  ./ext_module/battery_gauge/vendor
- ./ext_module/temp_humi/api
- ./ext_module/temp_humi/drivers/SHTC3/inc
+ ./ext_module/battery_gauge/api
+ ./ext_module/battery_gauge/port
+ ./ext_module/battery_gauge/vendor
  ./ext_module/barometer/api
  ./ext_module/barometer/drivers/SPA06/inc
 #  ./ext_module/accelerometer/api
@@ -32,8 +30,9 @@ target_sources(app PRIVATE
   src/my_shell.c
   src/my_ble_core.c
   src/my_lte.c
-  src/my_magnetic_uart.c
+  src/my_wifi_uart.c
   src/my_gsensor.c
+  src/my_lcd.c
   src/my_ctrl.c
   src/my_battery.c
   src/my_wdt.c
@@ -48,11 +47,9 @@ target_sources(app PRIVATE
   ext_module/QMI8658B/api/imu_api.c
   ext_module/QMI8658B/port/qmi8658b_port.c
   ext_module/QMI8658B/driver/qmi8658b_driver.c
-  # ext_module/battery_gauge/api/battery_gauge_api.c
-  # ext_module/battery_gauge/port/om70201wv_port.c
-  # ext_module/battery_gauge/vendor/omg_battery.c
-  ext_module/temp_humi/api/temp_humi_api.c
-  ext_module/temp_humi/drivers/SHTC3/src/shtc3_driver.c
+  ext_module/battery_gauge/api/battery_gauge_api.c
+  ext_module/battery_gauge/port/om70201wv_port.c
+  ext_module/battery_gauge/vendor/omg_battery.c
   ext_module/barometer/api/barometer_api.c
   ext_module/barometer/drivers/SPA06/src/spa06_driver.c
   # ext_module/accelerometer/api/accelerometer_api.c

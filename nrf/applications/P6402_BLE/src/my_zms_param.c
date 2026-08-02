@@ -70,7 +70,7 @@ const ble_log_config_t gDefaultBleLogConfig =
         (1U << BLE_LOG_MOD_PARAM)  |   /* bit10: PARAM  - 开启 */
         (1U << BLE_LOG_MOD_WDT)    |   /* bit11: WDT    - 开启 */
         (0U << BLE_LOG_MOD_ALGORITHM) | /* bit12: ALGORITHM - 关闭 */
-        (1U << BLE_LOG_MOD_MAGNETIC_UART) | /* bit13: MAGNETIC_UART - 开启 */
+        (1U << BLE_LOG_MOD_WIFI_UART) | /* bit13: WIFI_UART - 开启 */
         (0U << BLE_LOG_MOD_OTHER),     /* bit14: OTHER  - 关闭 */
     .mod_level = {
         [BLE_LOG_MOD_MAIN]   = LOG_LEVEL_INF,    /* bit0: MAIN    - 开启 */
@@ -86,7 +86,7 @@ const ble_log_config_t gDefaultBleLogConfig =
         [BLE_LOG_MOD_PARAM]  = LOG_LEVEL_INF,    /* bit10: PARAM  - 开启 */
         [BLE_LOG_MOD_WDT]    = LOG_LEVEL_INF,    /* bit11: WDT    - 开启 */
         [BLE_LOG_MOD_ALGORITHM] = LOG_LEVEL_NONE, /* bit12: ALGORITHM - 关闭 */
-        [BLE_LOG_MOD_MAGNETIC_UART] = LOG_LEVEL_INF, /* bit13: MAGNETIC_UART - 开启 */
+        [BLE_LOG_MOD_WIFI_UART] = LOG_LEVEL_INF, /* bit13: WIFI_UART - 开启 */
         [BLE_LOG_MOD_OTHER]  = LOG_LEVEL_NONE,   /* bit14: OTHER  - 关闭 */
     }
 };

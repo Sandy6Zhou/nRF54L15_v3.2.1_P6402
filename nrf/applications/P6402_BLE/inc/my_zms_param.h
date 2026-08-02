@@ -33,7 +33,7 @@
 #define BLE_LOG_MOD_PARAM   10 /* 参数模块 */
 #define BLE_LOG_MOD_WDT     11 /* 看门狗模块 */
 #define BLE_LOG_MOD_ALGORITHM 12 /* 算法模块 */
-#define BLE_LOG_MOD_MAGNETIC_UART 13 /* 磁吸串口模块 */
+#define BLE_LOG_MOD_WIFI_UART 13 /* WIFI串口模块 */
 #define BLE_LOG_MOD_OTHER   14 /* 其他模块 */
 #define BLE_LOG_MOD_MAX     15 /* 最大模块数 */
 

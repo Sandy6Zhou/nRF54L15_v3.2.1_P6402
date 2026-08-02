@@ -1,47 +1,57 @@
 /********************************************************************
 **版权所有         深圳市几米物联有限公司
-**文件名称:        my_magnetic_uart.h
-**文件描述:        磁吸串口模块头文件
+**文件名称:        my_wifi_uart.h
+**文件描述:        WIFI串口模块头文件
 **当前版本:        V1.0
 **作    者:       周森达 (zhousenda@jimiiot.com)
 **完成日期:        2026.07.20
 *********************************************************************
-** 功能描述:        1. 提供 UART20 磁吸串口异步收发接口
+** 功能描述:        1. 提供 UART20 WIFI串口异步收发接口
 **                 2. 提供独立线程处理接收数据
 **                 3. 接入统一 PM 框架实现串口挂起/恢复
+**                 4. 支持WIFI唤醒引脚(P0.02)中断恢复UART链路
 *********************************************************************/
 
-#ifndef _MY_MAGNETIC_UART_H_
-#define _MY_MAGNETIC_UART_H_
+#ifndef _MY_WIFI_UART_H_
+#define _MY_WIFI_UART_H_
 
-typedef void (*magnetic_uart_rx_handler_t)(uint8_t *data, uint16_t len);
+typedef void (*wifi_uart_rx_handler_t)(uint8_t *data, uint16_t len);
 
 /********************************************************************
-**函数名称:  my_magnetic_uart_init
+**函数名称:  my_wifi_pwr_on
+**入口参数:  on       ---        true 开启，false 关闭
+**出口参数:  无
+**函数功能:  控制WIFI模组供电（P2.08）
+**返回值:    0 表示成功，负值表示失败
+*********************************************************************/
+int my_wifi_pwr_on(bool on);
+
+/********************************************************************
+**函数名称:  my_wifi_uart_init
 **入口参数:  tid      ---        指向线程 ID 变量的指针
 **出口参数:  tid      ---        存储启动后的线程 ID
-**函数功能:  初始化磁吸串口模块并启动线程
+**函数功能:  初始化WIFI串口模块并启动线程
 **返回值:    0 表示成功，其他表示失败
 *********************************************************************/
-int my_magnetic_uart_init(k_tid_t *tid);
+int my_wifi_uart_init(k_tid_t *tid);
 
 /********************************************************************
-**函数名称:  my_magnetic_uart_send
+**函数名称:  my_wifi_uart_send
 **入口参数:  data     ---        待发送数据指针
 **           len      ---        数据长度
 **出口参数:  无
-**函数功能:  通过磁吸串口发送指定长度数据
+**函数功能:  通过WIFI串口发送指定长度数据
 **返回值:    0 表示成功，其他表示失败
 *********************************************************************/
-int my_magnetic_uart_send(const uint8_t *data, uint16_t len);
+int my_wifi_uart_send(const uint8_t *data, uint16_t len);
 
 /********************************************************************
-**函数名称:  my_magnetic_uart_register_rx_handler
+**函数名称:  my_wifi_uart_register_rx_handler
 **入口参数:  handler  ---        接收回调函数指针
 **出口参数:  无
-**函数功能:  注册磁吸串口接收数据处理回调
+**函数功能:  注册WIFI串口接收数据处理回调
 **返回值:    无
 *********************************************************************/
-void my_magnetic_uart_register_rx_handler(magnetic_uart_rx_handler_t handler);
+void my_wifi_uart_register_rx_handler(wifi_uart_rx_handler_t handler);
 
-#endif /* _MY_MAGNETIC_UART_H_ */
+#endif /* _MY_WIFI_UART_H_ */

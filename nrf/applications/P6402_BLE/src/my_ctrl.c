@@ -27,12 +27,9 @@ LOG_MODULE_REGISTER(my_ctrl, LOG_LEVEL_INF);
 
 /* 硬件设备树定义 */
 static const struct gpio_dt_spec fun_key = GPIO_DT_SPEC_GET(DT_ALIAS(fun_key), gpios);
+static const struct gpio_dt_spec sos_key = GPIO_DT_SPEC_GET(DT_ALIAS(sos_key), gpios);
 static const struct pwm_dt_spec buzzer = PWM_DT_SPEC_GET(DT_ALIAS(buzzer_pwm));
-static const struct gpio_dt_spec batt_leds[] = {
-    GPIO_DT_SPEC_GET(DT_ALIAS(battery_led0), gpios),
-    GPIO_DT_SPEC_GET(DT_ALIAS(battery_led1), gpios),
-    GPIO_DT_SPEC_GET(DT_ALIAS(battery_led2), gpios),
-};
+static const struct gpio_dt_spec baro_pwr_en = GPIO_DT_SPEC_GET(DT_ALIAS(baro_pwr_ctrl), gpios);
 
 static int ctrl_pwm_pm_init(void);
 // PWM 电源管理操作回调结构体
@@ -50,6 +47,14 @@ static struct
     uint32_t press_count; /* 按下计数器 (50ms单位) */
     bool pressed;         /* 按键是否按下 */
 } key_ctrl_t;
+
+/* SOS按键控制结构 */
+static struct
+{
+    struct k_timer timer; /* 50ms 轮询定时器 */
+    uint32_t press_count; /* 按下计数器 (50ms单位) */
+    bool pressed;         /* 按键是否按下 */
+} sos_key_ctrl_t;
 
 static buzzer_ctrl_t s_buzzer_ctrl = { 0 };
 fs_barometer_record_t g_barometer_sample = { 0 };
@@ -382,6 +387,23 @@ static void device_status_read(void)
 }
 
 /********************************************************************
+**函数名称:  barometer_pwr_on
+**入口参数:  on       ---        true 开启，false 关闭（输入）
+**出口参数:  无
+**函数功能:  控制气压传感器供电（P2.09，高电平使能）
+**返回值:    0 表示成功，负值表示失败
+*********************************************************************/
+int barometer_pwr_on(bool on)
+{
+    if (!gpio_is_ready_dt(&baro_pwr_en))
+    {
+        return -ENODEV;
+    }
+
+    return gpio_pin_configure_dt(&baro_pwr_en, on ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE);
+}
+
+/********************************************************************
 **函数名称:  sensor_module_init
 **入口参数:  无
 **出口参数:  无
@@ -392,6 +414,12 @@ static void sensor_module_init(void)
 {
     struct barometer_config barometer_cfg;
     barometer_result_t barometer_ret;
+
+    /* 打开气压传感器电源（P2.09） */
+    if (barometer_pwr_on(true) != 0)
+    {
+        MY_LOG_ERR("barometer power on fail");
+    }
 
     memset(&barometer_cfg, 0, sizeof(barometer_cfg));
     // 初始化气压传感器采样参数
@@ -425,8 +453,7 @@ static void sensor_module_init(void)
 void peripheral_close()
 {
     my_gsensor_pwr_on(false);
-    batt_enable(true);
-    batt_led_set_level(0);
+    charge_enable(true);
 }
 
 /********************************************************************
@@ -570,6 +597,56 @@ static void key_timer_handler(struct k_timer *timer)
 }
 
 /********************************************************************
+**函数名称:  sos_key_timer_handler
+**入口参数:  timer    ---   定时器指针
+**出口参数:  无
+**函数功能:  50ms轮询定时器回调，检测SOS按键状态
+**返 回 值:  无
+**功能描述:  1. 每50ms读取SOS按键电平
+**           2. 按键按下时计数器累加，达到60次(3s)触发长按事件
+**           3. 按键释放时停止定时器，根据计数判断短按并发送事件到主任务
+*********************************************************************/
+static void sos_key_timer_handler(struct k_timer *timer)
+{
+    ARG_UNUSED(timer);
+
+    int level = gpio_pin_get(sos_key.port, sos_key.pin);
+
+    if (level == 1)
+    {
+        /* 按键持续按下 */
+        if (!sos_key_ctrl_t.pressed)
+        {
+            sos_key_ctrl_t.pressed = true;
+            sos_key_ctrl_t.press_count = 0;
+        }
+
+        /* 计数器增加 */
+        sos_key_ctrl_t.press_count++;
+    }
+    else
+    {
+        /* 按键已释放 */
+        if (sos_key_ctrl_t.pressed)
+        {
+            sos_key_ctrl_t.pressed = false;
+            k_timer_stop(&sos_key_ctrl_t.timer);
+
+            /* 短按判断：大于等于100ms且小于3s */
+            if (sos_key_ctrl_t.press_count < KEY_LONG_PRESS_COUNT && sos_key_ctrl_t.press_count >= 2)
+            {
+                send_key_event(MY_MSG_CTRL_SOS_SHORT_PRESS);
+            }
+            else if (sos_key_ctrl_t.press_count >= KEY_LONG_PRESS_COUNT)
+            {
+                send_key_event(MY_MSG_CTRL_SOS_LONG_PRESS);
+            }
+            sos_key_ctrl_t.press_count = 0;
+        }
+    }
+}
+
+/********************************************************************
 **函数名称:  misc_io_isr
 **入口参数:  dev      ---   GPIO 设备指针
 **           cb       ---   回调结构体指针
@@ -591,6 +668,15 @@ static void misc_io_isr(const struct device *dev,
         {
             //定时器不在运行就启动定时器
             k_timer_start(&key_ctrl_t.timer, K_MSEC(KEY_POLL_PERIOD_MS), K_MSEC(KEY_POLL_PERIOD_MS));
+        }
+    }
+
+    if (pins & BIT(sos_key.pin))
+    {
+        if (!k_timer_remaining_get(&sos_key_ctrl_t.timer))
+        {
+            //定时器不在运行就启动定时器
+            k_timer_start(&sos_key_ctrl_t.timer, K_MSEC(KEY_POLL_PERIOD_MS), K_MSEC(KEY_POLL_PERIOD_MS));
         }
     }
 }
@@ -649,8 +735,32 @@ static int misc_io_init(void)
     /* 初始化按键定时器 */
     key_timer_init();
 
-    /* 注册按键中断回调 */
-    gpio_init_callback(&s_misc_io_cb, misc_io_isr, BIT(fun_key.pin));
+    /* 配置SOS按键为输入（P1.14 内部下拉） */
+    if (!device_is_ready(sos_key.port))
+    {
+        return -ENODEV;
+    }
+
+    ret = gpio_pin_configure(sos_key.port, sos_key.pin, GPIO_INPUT | GPIO_PULL_DOWN);
+    if (ret)
+    {
+        MY_LOG_ERR("Failed to configure sos_key: %d", ret);
+        return ret;
+    }
+
+    /* 配置SOS按键中断：上升沿触发 */
+    ret = gpio_pin_interrupt_configure_dt(&sos_key, GPIO_INT_EDGE_RISING);
+    if (ret)
+    {
+        MY_LOG_ERR("Failed to configure sos_key interrupt: %d", ret);
+        return ret;
+    }
+
+    /* 初始化SOS按键定时器 */
+    k_timer_init(&sos_key_ctrl_t.timer, sos_key_timer_handler, NULL);
+
+    /* 注册按键中断回调（fun_key 与 sos_key 共用同一 GPIO 端口 gpio1） */
+    gpio_init_callback(&s_misc_io_cb, misc_io_isr, BIT(fun_key.pin) | BIT(sos_key.pin));
     gpio_add_callback(fun_key.port, &s_misc_io_cb);
 
     return 0;
@@ -773,107 +883,12 @@ int my_ctrl_buzzer_play_sequence(const struct my_buzzer_note *notes, uint32_t nu
     return 0;
 }
 
-/* --- LED 功能实现 --- */
-
-/********************************************************************
-**函数名称:  leds_init
-**入口参数:  无
-**出口参数:  无
-**函数功能:  初始化 LED GPIO
-**返 回 值:  0 表示成功，负值表示失败
-**功能描述:  1. 检查 GPIO 设备就绪状态
-**           2. 配置电量指示灯为输出，默认灭
-*********************************************************************/
-static int leds_init(void)
-{
-    int ret;
-
-    /* 所有电量 LED 共用同一个 port（gpio2），检查第一个即可 */
-    if (!device_is_ready(batt_leds[0].port))
-    {
-        return -ENODEV;
-    }
-
-    /* 配置电量指示灯为输出，默认灭 */
-    for (size_t i = 0; i < ARRAY_SIZE(batt_leds); i++)
-    {
-        ret = gpio_pin_configure_dt(&batt_leds[i], GPIO_OUTPUT_INACTIVE);
-        if (ret)
-        {
-            return ret;
-        }
-    }
-
-    return 0;
-}
-
-/********************************************************************
-**函数名称:  my_led_process
-**入口参数:  led_id       --  LED ID，BATT_LED0~BATT_LED3
-**           led_cmd      --  LED 操作命令，OPEN_LED、CLOSE_LED、TOGGLE_LED、FICKER_LED
-**出口参数:  无
-**函数功能:  根据指定的操作命令执行相应的 LED 控制操作
-**返 回 值:  无
-*********************************************************************/
-void my_ctrl_led_process(my_led_id_t led_id, my_led_ctrl_cmd_t led_cmd)
-{
-    // MY_LOG_INF("my_led:%d cmd:%d", led_id, led_cmd);
-    // 根据 LED 操作命令执行不同的操作
-    switch (led_cmd)
-    {
-        case OPEN_LED:
-            gpio_pin_set_dt(&batt_leds[led_id], 1);
-            break;
-
-        case CLOSE_LED:
-            gpio_pin_set_dt(&batt_leds[led_id], 0);
-            break;
-
-         case TOGGLE_LED:
-            gpio_pin_toggle_dt(&batt_leds[led_id]);
-            break;
-
-        default:
-            /* 忽略未知操作 */
-            break;
-    }
-}
-
-/********************************************************************
-**函数名称:  batt_led_set_level
-**入口参数:  level    ---   电量等级 (0~3)
-**出口参数:  无
-**函数功能:  设置电量指示灯等级
-**返 回 值:  0 表示成功，负值表示失败
-**功能描述:  根据 level 值点亮对应数量的电量 LED
-**           0 -> 全灭
-**           1 -> 只亮 batt_led0
-**           2 -> 亮 batt_led0, batt_led1
-**           3 -> 亮 batt_led0, batt_led1, batt_led2
-*********************************************************************/
+/* 电量LED功能已删除：P2.07/P2.08/P2.09 改作充电使能/WIFI电源/气压计电源 */
 int batt_led_set_level(uint8_t level)
 {
-    int ret;
-    int on;
+    ARG_UNUSED(level);
 
-    if (level > 3)
-    {
-        level = 3;
-    }
-
-    for (size_t i = 0; i < ARRAY_SIZE(batt_leds); i++)
-    {
-        on = (i < level) ? 1 : 0;
-#if 0
-        ret = gpio_pin_set_dt(&batt_leds[i], on);
-        if (ret < 0)
-        {
-            return ret;
-        }
-#endif
-        my_ctrl_led_process(i, on);
-    }
-
+    /* 电量LED硬件已删除，保留空实现以兼容旧调用 */
     return 0;
 }
 
@@ -1140,14 +1155,12 @@ static void my_ctrl_task(void *p1, void *p2, void *p3)
                     my_stop_timer(MY_TIMER_LED_ENABLE);
                 }
                 led_enable(true);
-                batt_led_set_level(0);
                 my_send_msg(MOD_CTRL, MOD_CTRL, MY_MSG_LED_CTRL_MODE);
                 break;
 
             case MY_MSG_LED_DISABLE:
                 my_stop_timer(MY_TIMER_LED_BLINK);
                 led_enable(false);
-                batt_led_set_level(0);
                 break;
 
             default:
@@ -1177,10 +1190,9 @@ int my_ctrl_init(k_tid_t *tid)
     // 初始化消息队列
     my_init_msg_handler(MOD_CTRL, &my_ctrl_msgq);
 
-    //  初始化按键、光感、LED GPIO、batt
+    //  初始化按键、电池 GPIO
     batt_gpio_init();
     misc_io_init();
-    leds_init();
     // 注：初始化中会立即开启定时器触发batt_update_timer_handler回调，会向ctrl发送消息（由于未初始化会丢消息），需放在ctrl初始化之后
     batt_adc_init();
 
