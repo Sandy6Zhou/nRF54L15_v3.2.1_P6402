@@ -34,10 +34,8 @@ typedef enum
     BLE_RSP_OTA,      // BLE+OTA=OK
     BLE_RSP_INFO,     // BLE+INFO=OK
     BLE_RSP_MACINFO,  // BLE+MACINFO=OK,START/END/seq
-    BLE_RSP_WMODE,    // BLE+WMODE=OK
     BLE_RSP_PWROFF,   // BLE+PWROFF=OK
     BLE_RSP_PULSE,    // BLE+PULSE=OK,<持续时间(分钟)>
-    BLE_RSP_TH,       // BLE+TH=OK
     BLE_RSP_BP,       // BLE+BP=OK
     BLE_RSP_CDATA,    // BLE+CDATA=OK,START/END/seq
     BLE_RSP_FACTORY,  // BLE+FACTORY=OK

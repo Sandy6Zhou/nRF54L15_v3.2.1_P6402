@@ -22,22 +22,14 @@
 /* FLASH循环存储测试开关：置1开启shell测试命令及调试接口 */
 #define FS_STORE_TEST_ENABLE        0
 
-/* 数据类型选择：TAG扫描数据 / 透传MAC扫描数据 */
+/* 数据类型选择：TAG扫描数据 / 透传MAC扫描数据 / 气压数据 */
 typedef enum
 {
     FS_TYPE_TAG = 0,        // TAG扫描结果数据
     FS_TYPE_MAC,            // 透传MAC扫描结果数据
-    FS_TYPE_TH,             // 温湿度数据
     FS_TYPE_BP,             // 气压数据
     FS_TYPE_MAX             // 类型数量
 } fs_data_type_t;
-
-typedef struct
-{
-    uint32_t timestamp;         // 采样时间戳(秒)
-    int16_t temperature_x10;    // 温度，单位0.1摄氏度
-    uint16_t humidity_x10;      // 湿度，单位0.1%RH
-} fs_temp_humi_record_t;
 
 typedef struct
 {
@@ -96,15 +88,6 @@ int my_flash_store_push_tag(const tag_scan_result_t *rec_ptr);
 **返 回 值:  0表示成功，负值表示失败
 *********************************************************************/
 int my_flash_store_push_mac(const tran_mac_result_item_t *rec_ptr);
-
-/********************************************************************
-**函数名称:  my_flash_store_push_th
-**入口参数:  rec_ptr   ---        待存储的温湿度记录指针（输入）
-**出口参数:  无
-**函数功能:  追加一条温湿度记录到TH区RAM暂存缓冲；暂存满一整扇区则批量写入FLASH
-**返 回 值:  0表示成功，负值表示失败
-*********************************************************************/
-int my_flash_store_push_th(const fs_temp_humi_record_t *rec_ptr);
 
 /********************************************************************
 **函数名称:  my_flash_store_push_bp

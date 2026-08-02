@@ -39,8 +39,6 @@
 		battery-gauge-int = &battery_gauge_int;
 		charge-detect = &charge_det;
 		magnetic-uart = &uart20;
-		light-tamper-detect = &light_tamper_pin;
-		light-pull-detect = &light_pull_pin;
 		battery-led0 = &batt_led0;
 		battery-led1 = &batt_led1;
 		battery-led2 = &batt_led2;
@@ -124,20 +122,6 @@
 	zephyr,user {
 		/* 通道 0：电池电压（P1.13 / AIN6）*/
 		io-channels = <&adc 0>;
-	};
-
-	/* 光感拆壳检测：P1.10，外部1M下拉，有光高电平，无光低电平 */
-	/* 光感拆卸检测：P1.14，外部1M下拉，有光高电平，无光低电平 */
-	light_det: light-det {
-		compatible = "gpio-keys";
-		light_tamper_pin: light_tamper_pin {
-			gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-			label = "Light Tamper Detect";
-		};
-		light_pull_pin: light_pull_pin {
-			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-			label = "Light Pull Detect";
-		};
 	};
 
 	/* 电量指示灯组：P2.7 / P2.8 / P2.9 */
@@ -307,7 +291,7 @@
 	clock-frequency = <I2C_BITRATE_STANDARD>;
 };
 
-/* ADC 配置：通道 0 = AIN6(P1.13)，通道 1 = AIN7(P1.14) */
+/* ADC 配置：通道 0 = AIN6(P1.13) */
 &adc {
 	#address-cells = <1>;
 	#size-cells = <0>;
@@ -343,7 +327,7 @@
 /* 新增：为 gpio1 启用 sense 机制，降低功耗 */
 &gpio1 {
 	status = "okay";
-	sense-edge-mask = <(BIT(2) | BIT(9) | BIT(10))>;  /* P1.2、P1.9 和 P1.10 */
+	sense-edge-mask = <(BIT(2) | BIT(9))>;  /* P1.2 和 P1.9 */
 };
 
 &wdt31 {

@@ -52,32 +52,18 @@ typedef enum                           // 参数ID定义
     ZMS_ID_MAC,                        // 设备MAC地址参数ID
     ZMS_ID_BLE_TX_POWER,               // 蓝牙发射功率参数ID
     ZMS_ID_BLE_LOG_CONFIG,             // 蓝牙日志配置参数ID
-    ZMS_ID_WORK_MODE_CONFIG,           // 设备工作模式配置参数ID
-    ZMS_ID_REM_ALM_CONFIG,             // 防拆壳报警配置参数ID
-    ZMS_ID_PULL_ALM_CONFIG,            // 防拆卸报警配置参数ID
-    ZMS_ID_PATMALM_CONFIG,             // 气压报警配置参数ID
-    ZMS_ID_TEMPALM_CONFIG,             // 温湿度报警配置参数ID
-    ZMS_ID_MOT_DET_CONFIG,             // 运动检测配置参数ID
-    ZMS_ID_MOTDETALM_CONFIG,           // 运动检测报警报警配置参数ID
     ZMS_ID_BAT_LEVEL_CONFIG,           // 电池状态和充电状态报警配置参数ID
-    ZMS_ID_STARTR_CONFIG,              // 数据记录功能配置参数ID
     ZMS_ID_PWRLIMIT_CONFIG,            // 限制按键关机配置参数ID
     ZMS_ID_BT_UPDATA_CONFIG,           // 蓝牙数据上传配置参数ID
     ZMS_ID_BLUETOOTH_CONFIG,           // 蓝牙开启配置参数ID
     ZMS_ID_BTCONNECT_CONFIG,           // 蓝牙连接配置参数ID
     ZMS_ID_TAG_CONFIG,                 // Tag定位功能配置参数ID
     ZMS_ID_LED_CONFIG,                 // LED显示配置参数ID
-    ZMS_ID_LTINT_CONFIG,               // 光感过滤配置参数ID
     ZMS_ID_BUZZER_CONFIG,              // 蜂鸣器配置参数ID
     ZMS_ID_BT_PARMAC_CONFIG,           // 透传MAC地址配置参数ID
-    ZMS_ID_LPSLEEP_CONFIG,             // 低功耗运行配置参数ID
     ZMS_ID_BLE_TAG_STORE_META,         // BLE TAG扫描数据循环存储区元数据ID
     ZMS_ID_BLE_MAC_STORE_META,         // BLE 透传MAC扫描数据循环存储区元数据ID
     ZMS_ID_PATM_TIMER_CONFIG,          // 气压定时上传配置参数ID
-    ZMS_ID_TEMP_TIMER_CONFIG,          // 温湿度定时上传配置参数ID
-    ZMS_ID_IMU_ALM_CONFIG,             // IMU翻转报警配置参数ID
-    ZMS_ID_IMU_ZERO_BIAS_CONFIG,       // IMU零偏配置参数ID
-    ZMS_ID_BLE_TH_STORE_META,          // BLE 温湿度循环存储区元数据ID
     ZMS_ID_BLE_BP_STORE_META,          // BLE 气压循环存储区元数据ID
 } my_zms_id_t;
 
@@ -133,62 +119,6 @@ typedef struct                              // 存储的蓝牙日志配置参数
     uint8_t  mod_level[BLE_LOG_MOD_MAX];    // 各模块日志等级阈值
 } ble_log_config_t;
 
-typedef struct                              // 存储的设备工作模式配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    device_work_mode_config_t workmode_config;   // 设备工作模式配置结构体
-} work_mode_config_t;
-
-typedef struct                              // 存储的防拆报警配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint8_t remalm_sw;                      // 防拆报警开关: 0-OFF, 1-ON
-    uint8_t remalm_mode;                    // 报警上报方式: 0-不上报, 1-GPRS, 2-GPRS+SMS, 3-GPRS+SMS+CALL
-} remalm_config_t;
-
-typedef struct                              // 存储的防拆卸报警配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint8_t pullalm_sw;                     // 防拆卸报警开关: 0-OFF, 1-ON
-    uint8_t pullalm_mode;                   // 报警上报方式: 0-不上报, 1-GPRS, 2-GPRS+SMS, 3-GPRS+SMS+CALL
-} pullalm_config_t;
-
-typedef struct                              // 存储的气压报警配置参数
-{
-    uint8_t flag;                          // 参数有效标志
-    uint8_t patalm_sw;                     // 气压报警开关: 0-OFF, 1-ON
-    uint8_t patalm_low_threshold;          // 低压报警阈值: 30-250 (单位：kPa,设置为255表示低压不报警)
-    uint8_t patalm_high_threshold;         // 高压报警阈值: 30-250 (单位：kPa,设置为255表示高压不报警)
-    uint8_t patalm_report_type;            // 气压报警上报方式: 0-不上报, 1-GPRS, 2-GPRS+SMS, 3-GPRS+SMS+CALL
-    uint8_t patalm_report_interval;        // 重复气压报警上报时间间隔: 0-60 (单位：分钟,设置为0表示不重复上报)
-} patalm_config_t;
-
-typedef struct                              // 存储的温湿度报警配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint8_t tempalm_sw;                     // 温报警开关: 0-OFF, 1-ON
-    int temp_low_threshold;                 // 低温报警阈值: -30 - 100 (单位：℃,设置为255表示低温不报警)
-    int temp_high_threshold;                // 高温报警阈值: -30 - 100 (单位：℃,设置为255表示高温不报警)
-    uint8_t humi_low_threshold;             // 低湿度报警阈值: 0-100 (单位：%,设置为255表示低湿度不报警)
-    uint8_t humi_high_threshold;            // 高湿度报警阈值: 0-100 (单位：%,设置为255表示高湿度不报警)
-    uint8_t tempalm_report_type;            // 温湿度报警上报方式: 0-不上报, 1-GPRS, 2-GPRS+SMS, 3-GPRS+SMS+CALL
-    uint8_t tempalm_report_interval;        // 重复温湿度报警上报时间间隔: 0-60 (单位：分钟,设置为0表示不重复上报)
-} tempalm_config_t;
-
-typedef struct                              // 存储的运动检测报警配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint16_t motdet_vibration;              // 运动检测震动次数 (1-500)
-    uint16_t motdet_duration;               // 运动检测判断时间 (1-3600s)
-} mot_det_config_t;
-
-typedef struct                              // 存储的运动检测报警报警配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint8_t motdetalm_sw;                   // 运动检测报警报警开关: 0-OFF, 1-ON
-    uint8_t motdetalm_report_type;            // 报警上报方式: 0-不上报, 1-GPRS, 2-GPRS+SMS, 3-GPRS+SMS+CALL
-} motdetalm_config_t;
-
 typedef struct                              // 存储的电池状态和充电状态报警配置参数
 {
     uint8_t flag;                           // 参数有效标志
@@ -201,11 +131,6 @@ typedef struct                              // 存储的电池状态和充电状
     uint8_t chargesta_report;               // 充电状态上报方式: 0-不上报, 1-GPRS, 2-GPRS+SMS, 3-GPRS+SMS+CALL
 } bat_level_config_t;
 
-typedef struct                              // 存储的数据记录功能配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint8_t startr_sw;                      // 数据记录功能开关: 0-OFF, 1-ON
-} startr_config_t;
 
 typedef struct                              // 存储的限制按键关机配置参数
 {
@@ -213,13 +138,6 @@ typedef struct                              // 存储的限制按键关机配置
     uint8_t pwrlimit_sw;                    // 限制按键关机开关: 0-OFF, 1-ON
 } pwrlimit_config_t;
 
-typedef struct                              // 存储的低功耗运行配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint8_t lprunning_sw;                   // 功能开关: 0-OFF, 1-ON
-    uint8_t lprunning_threshold;            // 进入低功耗运行的电量百分比阈值 (10~50, 默认20)
-    uint8_t lprunning_interval;             // 定时唤醒间隔T (1~48小时, 默认24)
-} lprunning_config_t;
 
 typedef struct                              // 存储的蓝牙数据上传配置参数
 {
@@ -260,13 +178,6 @@ typedef struct                              // 存储的LED显示配置参数
     uint8_t led_display;                    // LED显示模式: 0-一直关闭, 1-按键显示, 2-全时显示
 } led_config_t;
 
-typedef struct                              // 存储的光感过滤配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint16_t T1;                            // 检测到光的连续时间超过T1时，切换为“Light”状态 100~5000ms
-    uint16_t T2;                            // 检测到暗的连续时间超过T2时，切换为“Dark”状态 100~5000ms
-} ltint_config_t;
-
 typedef struct                              // 存储的蜂鸣器配置参数
 {
     uint8_t flag;                           // 参数有效标志
@@ -287,33 +198,8 @@ typedef struct                              // 存储的气压定时上传配置
     uint8_t wakeup_cell_sw;                 // 4G离线时是否唤醒: 0-OFF, 1-ON
 } patm_timer_config_t;
 
-typedef struct                              // 存储的温湿度定时上传配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint16_t interval_min;                  // 上传间隔(分钟): 0或10~1440
-    uint8_t wakeup_cell_sw;                 // 4G离线时是否唤醒: 0-OFF, 1-ON
-} temp_timer_config_t;
 
-typedef struct                              // 存储的IMU翻转报警配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint8_t imu_alm_sw;                     // IMU翻转报警开关: 0-OFF, 1-ON
-    uint8_t imu_alm_report;                 // IMU翻转报警上报方式: 0-不上报, 1-GPRS, 2-GPRS+SMS, 3-GPRS+SMS+CALL
-    uint8_t imu_roll_threshold;             // IMU横滚角报警阈值: 5~60度，若设置255则关闭该维度的角度检测
-    uint8_t imu_pitch_threshold;            // IMU俯仰角报警阈值: 5~60度，若设置255则关闭该维度的角度检测
-    uint8_t imu_yaw_threshold;              // IMU偏航角报警阈值: 5~60度，若设置255则关闭该维度的角度检测
-    uint8_t imu_duration_time;              // IMU超过阈值持续时间: 1~180s
-    uint8_t imu_duration_count;             // IMU超过阈值持续次数: 1~10次,预留接口
-    uint8_t recover_time;                   // 恢复时间: 1~30s
-} imu_alm_config_t;
 
-typedef struct                              // 存储的IMU零偏配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    float gyro_bias_x;                      // 陀螺仪零偏估计 X (rad/s, 在线逐步追踪)
-    float gyro_bias_y;                      // 陀螺仪零偏估计 Y (rad/s)
-    float gyro_bias_z;                      // 陀螺仪零偏估计 Z (rad/s)
-} imu_zero_bias_config_t;
 
 typedef struct
 {
@@ -325,29 +211,16 @@ typedef struct
     macaddr_t                   my_macaddr;                 // 设备MAC地址
     ble_tx_power_t              ble_tx_power;               // 蓝牙发射功率
     ble_log_config_t            ble_log_config;             // 蓝牙日志配置
-    work_mode_config_t          device_workmode_config;     // 设备工作模式配置
-    remalm_config_t             remalm_config;              // 防拆壳报警配置
-    pullalm_config_t            pullalm_config;             // 防拆卸报警配置
-    patalm_config_t             patalm_config;              // 气压报警配置
-    tempalm_config_t            tempalm_config;             // 温湿度报警配置
-    mot_det_config_t            motdet_config;              // 运动检测报警配置
-    motdetalm_config_t          motdetalm_config;           // 运动检测报警报警配置
     bat_level_config_t          batlevel_config;            // 电池状态和充电状态报警配置
-    startr_config_t             startr_config;              // 数据记录功能配置
     pwrlimit_config_t           pwrlimit_config;            // 限制按键关机配置
-    lprunning_config_t          lprunning_config;           // 低功耗运行配置
     bt_updata_config_t          bt_updata_config;           // 蓝牙数据上传配置
     bluetooth_config_t          bluetooth_config;           // 蓝牙开启配置
     btconnect_config_t          btconnect_config;           // 蓝牙连接配置
     tag_config_t                tag_config;                 // Tag定位功能配置
     led_config_t                led_config;                 // LED显示配置
-    ltint_config_t              ltint_config;               // 光感过滤配置
     buzzer_config_t             buzzer_config;              // 蜂鸣器配置
     bparmac_config_t            bparmac_config;             // 透传mac地址配置
     patm_timer_config_t         patm_timer_config;          // 气压定时上传配置
-    temp_timer_config_t         temp_timer_config;          // 温湿度定时上传配置
-    imu_alm_config_t            imu_alm_config;             // IMU翻转报警配置
-    imu_zero_bias_config_t      imu_zero_bias_config;       // IMU零偏配置
 } config_param_t;
 
 extern config_param_t    gConfigParam;

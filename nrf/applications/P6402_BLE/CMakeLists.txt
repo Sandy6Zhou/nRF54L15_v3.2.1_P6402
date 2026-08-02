@@ -11,9 +11,9 @@ project(LL311_BLE)
 target_include_directories(app PRIVATE
  ./inc
  ./src
- ./ext_module/imu/api
- ./ext_module/imu/port
- ./ext_module/imu/vendor
+ ./ext_module/QMI8658B/api
+ ./ext_module/QMI8658B/port
+ ./ext_module/QMI8658B/driver
 #  ./ext_module/battery_gauge/api
 #  ./ext_module/battery_gauge/port
 #  ./ext_module/battery_gauge/vendor
@@ -34,7 +34,6 @@ target_sources(app PRIVATE
   src/my_lte.c
   src/my_magnetic_uart.c
   src/my_gsensor.c
-  src/my_gsensor_algorithm.c
   src/my_ctrl.c
   src/my_battery.c
   src/my_wdt.c
@@ -46,10 +45,9 @@ target_sources(app PRIVATE
   src/my_dfu_jimi.c
   src/my_pm.c
   src/my_ble_scan.c
-  ext_module/imu/api/imu_api.c
-  ext_module/imu/port/bmi325_port.c
-  ext_module/imu/vendor/bmi325.c
-  ext_module/imu/vendor/bmi3.c
+  ext_module/QMI8658B/api/imu_api.c
+  ext_module/QMI8658B/port/qmi8658b_port.c
+  ext_module/QMI8658B/driver/qmi8658b_driver.c
   # ext_module/battery_gauge/api/battery_gauge_api.c
   # ext_module/battery_gauge/port/om70201wv_port.c
   # ext_module/battery_gauge/vendor/omg_battery.c

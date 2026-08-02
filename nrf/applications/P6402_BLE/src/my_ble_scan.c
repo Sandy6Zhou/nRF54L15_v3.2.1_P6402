@@ -69,7 +69,6 @@ static uint16_t s_rt_count_snap = 0;
 typedef enum
 {
     SENSOR_UPLOAD_STATE_IDLE = 0,
-    SENSOR_UPLOAD_STATE_TH_WAIT_ACK,
     SENSOR_UPLOAD_STATE_BP_WAIT_ACK,
     SENSOR_UPLOAD_STATE_CDATA_WAIT_START_ACK,
     SENSOR_UPLOAD_STATE_CDATA_WAIT_DATA_ACK,
@@ -88,7 +87,6 @@ typedef struct
 #define SENSOR_CDATA_CMD_PREFIX_LEN          10U      // "BLE+CDATA=" 固定前缀长度
 #define SENSOR_CDATA_PARAM_MAX_LEN           (SENSOR_CDATA_UART_FRAME_MAX_LEN - SENSOR_CDATA_CMD_PREFIX_LEN - 2U) // CDATA参数区最大长度，额外预留"\r\n"
 #define SENSOR_CDATA_PREFIX_RESERVED_LEN     24U      // 预留"seq,data_sum"文本前缀空间：seq最大5位 + data_sum最大5位 + 1个逗号 + 结尾'\0'，并额外留裕量
-#define SENSOR_CDATA_TH_RECORD_MAX_TEXT_LEN  25U      // 单条TH记录最大文本长度：",4294967295,-32768,65535" 共24字符，外加结尾'\0'预留
 #define SENSOR_CDATA_BP_RECORD_MAX_TEXT_LEN  22U      // 单条BP记录最大文本长度：",4294967295,4294967295" 共21字符，外加结尾'\0'预留
 
 static sensor_upload_ctx_t s_sensor_upload_ctx = { 0 };
@@ -1080,9 +1078,6 @@ static uint16_t sensor_cdata_record_max_text_len_get(fs_data_type_t type)
 {
     switch (type)
     {
-        case FS_TYPE_TH:
-            return SENSOR_CDATA_TH_RECORD_MAX_TEXT_LEN;
-
         case FS_TYPE_BP:
             return SENSOR_CDATA_BP_RECORD_MAX_TEXT_LEN;
 
@@ -1123,15 +1118,12 @@ static uint16_t sensor_cdata_max_records_per_packet(fs_data_type_t type)
 **入口参数:  type      ---        FLASH数据类型（输入）
 **出口参数:  无
 **函数功能:  将FLASH数据类型转换为CDATA协议数据类型编号
-**返 回 值:  1表示温湿度，2表示气压
+**返 回 值:  2表示气压
 *********************************************************************/
 static uint8_t sensor_cdata_type_get(fs_data_type_t type)
 {
     switch (type)
     {
-        case FS_TYPE_TH:
-            return 1;
-
         case FS_TYPE_BP:
             return 2;
 
@@ -1163,7 +1155,7 @@ static bool sensor_upload_busy(void)
 static void sensor_upload_reset(bool rewind_flash)
 {
     if (rewind_flash &&
-        (s_sensor_upload_ctx.upload_type == FS_TYPE_TH || s_sensor_upload_ctx.upload_type == FS_TYPE_BP) &&
+        (s_sensor_upload_ctx.upload_type == FS_TYPE_BP) &&
         (s_sensor_upload_ctx.state == SENSOR_UPLOAD_STATE_CDATA_WAIT_START_ACK ||
          s_sensor_upload_ctx.state == SENSOR_UPLOAD_STATE_CDATA_WAIT_DATA_ACK ||
          s_sensor_upload_ctx.state == SENSOR_UPLOAD_STATE_CDATA_WAIT_END_ACK))
@@ -1186,7 +1178,6 @@ static void sensor_upload_reset(bool rewind_flash)
 *********************************************************************/
 static int sensor_cdata_send_next_packet(void)
 {
-    fs_temp_humi_record_t th_record;
     fs_barometer_record_t bp_record;
     char prefix_buf[SENSOR_CDATA_PREFIX_RESERVED_LEN];
     uint16_t data_sum;
@@ -1216,37 +1207,18 @@ static int sensor_cdata_send_next_packet(void)
     while ((data_sum < max_records) &&
            (used_len + record_max_len + 1U <= sizeof(s_sensor_upload_frame_buf)))
     {
-        if (s_sensor_upload_ctx.upload_type == FS_TYPE_TH)
+        ret = my_flash_store_read_next(FS_TYPE_BP, &bp_record);
+        if (ret <= 0)
         {
-            ret = my_flash_store_read_next(FS_TYPE_TH, &th_record);
-            if (ret <= 0)
-            {
-                break;
-            }
-
-            // TH文本协议格式：",时间戳,温度,湿度"
-            append_len = snprintf((char *)&s_sensor_upload_frame_buf[used_len],
-                                  sizeof(s_sensor_upload_frame_buf) - used_len,
-                                  ",%u,%d,%u",
-                                  th_record.timestamp,
-                                  th_record.temperature_x10,
-                                  th_record.humidity_x10);
+            break;
         }
-        else
-        {
-            ret = my_flash_store_read_next(FS_TYPE_BP, &bp_record);
-            if (ret <= 0)
-            {
-                break;
-            }
 
-            // BP文本协议格式：",时间戳,气压"
-            append_len = snprintf((char *)&s_sensor_upload_frame_buf[used_len],
-                                  sizeof(s_sensor_upload_frame_buf) - used_len,
-                                  ",%u,%u",
-                                  bp_record.timestamp,
-                                  bp_record.pressure_pa);
-        }
+        // BP文本协议格式：",时间戳,气压"
+        append_len = snprintf((char *)&s_sensor_upload_frame_buf[used_len],
+                              sizeof(s_sensor_upload_frame_buf) - used_len,
+                              ",%u,%u",
+                              bp_record.timestamp,
+                              bp_record.pressure_pa);
 
         if ((append_len <= 0) || ((size_t)append_len >= sizeof(s_sensor_upload_frame_buf) - used_len))
         {
@@ -1313,11 +1285,7 @@ static void sensor_cached_upload_try_start(void)
     }
 
     upload_type = FS_TYPE_MAX;
-    if (my_flash_store_pending_count(FS_TYPE_TH) > 0)
-    {
-        upload_type = FS_TYPE_TH;
-    }
-    else if (my_flash_store_pending_count(FS_TYPE_BP) > 0)
+    if (my_flash_store_pending_count(FS_TYPE_BP) > 0)
     {
         upload_type = FS_TYPE_BP;
     }
@@ -1374,9 +1342,7 @@ static int sensor_realtime_upload_start(const char *cmd_name, fs_data_type_t upl
     }
 
     s_sensor_upload_ctx.upload_type = upload_type;
-    s_sensor_upload_ctx.state = (upload_type == FS_TYPE_TH) ?
-                                 SENSOR_UPLOAD_STATE_TH_WAIT_ACK :
-                                 SENSOR_UPLOAD_STATE_BP_WAIT_ACK;
+    s_sensor_upload_ctx.state = SENSOR_UPLOAD_STATE_BP_WAIT_ACK;
 
     ret = lte_send_command(cmd_name, param_ptr);
     if (ret != 0)
@@ -1385,48 +1351,6 @@ static int sensor_realtime_upload_start(const char *cmd_name, fs_data_type_t upl
     }
 
     return ret;
-}
-
-/********************************************************************
-**函数名称:  sensor_process_temp_humi_sample
-**入口参数:  record_ptr ---        温湿度记录指针（输入）
-**出口参数:  无
-**函数功能:  处理CTRL采样得到的温湿度数据
-**返 回 值:  无
-*********************************************************************/
-static void sensor_process_temp_humi_sample(const fs_temp_humi_record_t *record_ptr)
-{
-    char param_buf[48];
-
-    if (record_ptr == NULL)
-    {
-        return;
-    }
-
-    // LOG_INF("%s:%d,%u,%d,%d", __func__, g_bLteReady, record_ptr->timestamp, record_ptr->temperature_x10, record_ptr->humidity_x10);
-
-    if (g_bLteReady)
-    {
-        // LTE已在线时优先尝试实时直传，成功则本条数据不进入缓存，降低补传压力和FLASH写入次数。
-        snprintf(param_buf, sizeof(param_buf), "%u,%d,%u",
-                 record_ptr->timestamp,
-                 record_ptr->temperature_x10,
-                 record_ptr->humidity_x10);
-        if (sensor_realtime_upload_start("TH", FS_TYPE_TH, param_buf) == 0)
-        {
-            return;
-        }
-    }
-
-    // 走到这里说明LTE当前不可用，或实时直传因会话冲突/发送失败未发出，本条数据必须落缓存避免丢失。
-    my_flash_store_push_th(record_ptr);
-
-    if (!g_bLteReady && gConfigParam.temp_timer_config.wakeup_cell_sw)
-    {
-        // 若配置允许“采样触发唤醒蜂窝”，则在缓存后主动拉起LTE，待上线后再由CDATA补传历史记录。
-        set_lte_boot_reason(LTE_BOOT_REASON_SCAN);
-        my_send_msg(MOD_BLE, MOD_LTE, MY_MSG_LTE_PWRON);
-    }
 }
 
 /********************************************************************
@@ -1484,10 +1408,8 @@ static void sensor_handle_lte_ack(const ble_rsp_result_t *rsp_ptr)
 
     switch (rsp_ptr->type)
     {
-        case BLE_RSP_TH:
         case BLE_RSP_BP:
-            if ((rsp_ptr->type == BLE_RSP_TH && s_sensor_upload_ctx.state == SENSOR_UPLOAD_STATE_TH_WAIT_ACK) ||
-                (rsp_ptr->type == BLE_RSP_BP && s_sensor_upload_ctx.state == SENSOR_UPLOAD_STATE_BP_WAIT_ACK))
+            if (rsp_ptr->type == BLE_RSP_BP && s_sensor_upload_ctx.state == SENSOR_UPLOAD_STATE_BP_WAIT_ACK)
             {
                 // 实时单条上报收到OK后，当前会话结束；若缓存区还有历史记录，立即衔接CDATA补传。
                 sensor_upload_reset(false);
@@ -2131,10 +2053,6 @@ void my_scan_msg_handler(msg_t *msg)
                     break;
             }
             sensor_cached_upload_try_start();
-            break;
-
-        case MY_MSG_BLE_SENSOR_TH_SAMPLE:
-            sensor_process_temp_humi_sample(&g_temp_humi_sample);
             break;
 
         case MY_MSG_BLE_SENSOR_BP_SAMPLE:

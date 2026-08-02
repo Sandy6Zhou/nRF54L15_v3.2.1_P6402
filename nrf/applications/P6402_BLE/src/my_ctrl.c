@@ -28,8 +28,6 @@ LOG_MODULE_REGISTER(my_ctrl, LOG_LEVEL_INF);
 /* 硬件设备树定义 */
 static const struct gpio_dt_spec fun_key = GPIO_DT_SPEC_GET(DT_ALIAS(fun_key), gpios);
 static const struct pwm_dt_spec buzzer = PWM_DT_SPEC_GET(DT_ALIAS(buzzer_pwm));
-static const struct gpio_dt_spec light_tamper_det = GPIO_DT_SPEC_GET(DT_ALIAS(light_tamper_detect), gpios);
-static const struct gpio_dt_spec light_pull_det = GPIO_DT_SPEC_GET(DT_ALIAS(light_pull_detect), gpios);
 static const struct gpio_dt_spec batt_leds[] = {
     GPIO_DT_SPEC_GET(DT_ALIAS(battery_led0), gpios),
     GPIO_DT_SPEC_GET(DT_ALIAS(battery_led1), gpios),
@@ -53,37 +51,12 @@ static struct
     bool pressed;         /* 按键是否按下 */
 } key_ctrl_t;
 
-/* 光感检测控制结构 */
-typedef struct
-{
-    struct k_timer timer;       /* 延时定时器 */
-    bool state;                 /* 当前光感状态（true=有光，false=无光） */
-} light_sensor_t;
-
-typedef enum
-{
-    LOW_PATM_TEMP_ALARM,
-    NORMAL_PATM_TEMP_ALARM,
-    HIGH_PATM_TEMP_ALARM,
-} my_alarm_type_t;
-
-static light_sensor_t light_tamper_sensor;
-static light_sensor_t light_pull_sensor;
-
 static buzzer_ctrl_t s_buzzer_ctrl = { 0 };
-fs_temp_humi_record_t g_temp_humi_sample = { 0 };
 fs_barometer_record_t g_barometer_sample = { 0 };
-
-static my_alarm_type_t s_barometer_alarm_state = NORMAL_PATM_TEMP_ALARM;    // 气压告警状态
-static my_alarm_type_t s_temp_alarm_state = NORMAL_PATM_TEMP_ALARM;         // 温度告警状态
-static my_alarm_type_t s_humi_alarm_state = NORMAL_PATM_TEMP_ALARM;         // 湿度告警状态
 
 /* 定时器回调前向声明 */
 static void key_timer_handler(struct k_timer *timer);
-static void light_tamper_sensor_timer_handler(struct k_timer *timer);
-static void light_pull_sensor_timer_handler(struct k_timer *timer);
 static void patm_upload_timer_handler(struct k_timer *timer);
-static void temp_upload_timer_handler(struct k_timer *timer);
 
 /* 消息队列定义 */
 K_MSGQ_DEFINE(my_ctrl_msgq, sizeof(msg_t), 10, 4);
@@ -95,30 +68,6 @@ static struct gpio_callback s_misc_io_cb;
 
 /* 蜂鸣器100ms定时器 */
 static struct k_timer s_buzzer_timer;
-
-/************************************************************
-**函数名称:  get_light_tamper_state
-**入口参数:  无
-**出口参数:  无
-**函数功能:  获取当前拆壳光感状态
-**返回值:    光感状态（true=有光，false=无光）
-*********************************************************************/
-bool get_light_tamper_state(void)
-{
-    return light_tamper_sensor.state;
-}
-
-/************************************************************
-**函数名称:  get_light_pull_state
-**入口参数:  无
-**出口参数:  无
-**函数功能:  获取当前拆卸光感状态
-**返回值:    光感状态（true=有光，false=无光）
-*********************************************************************/
-bool get_light_pull_state(void)
-{
-    return light_pull_sensor.state;
-}
 
 /********************************************************************
 **函数名称:  send_alarm_message_to_lte
@@ -184,39 +133,10 @@ void send_alarm_message_to_lte(alarm_type_t alarm_type, const char *additional_i
             }
             break;
 
-        case ALARM_REMOVE:               // 拆卸告警
-            rpt = gConfigParam.pullalm_config.pullalm_mode;
-            break;
-
-        case ALARM_CASE_OPEN:            // 拆壳告警
-            rpt = gConfigParam.remalm_config.remalm_mode;
-            break;
-
-        case ALARM_MOVE_START:           // 开始运动告警
-        case ALARM_MOVE_STOP:            // 停止运动告警
-            rpt = gConfigParam.motdetalm_config.motdetalm_report_type;
-            break;
-
         case ALARM_BLE_CONNECTED:        // 蓝牙连接成功告警
         case ALARM_BLE_CONNECT_ERR:      // 蓝牙连接异常告警
             rpt = gConfigParam.btconnect_config.btconnect_report;
             break;
-        case ALARM_HIGH_PATM:            // 高压告警
-        case ALARM_LOW_PATM:             // 低压告警
-            rpt = gConfigParam.patalm_config.patalm_report_type;
-            break;
-        case ALARM_HIGH_TEMP:            // 高温告警
-        case ALARM_LOW_TEMP:             // 低温告警
-        case ALARM_HIGH_HUMI:            // 高湿告警
-        case ALARM_LOW_HUMI:             // 低湿告警
-            rpt = gConfigParam.tempalm_config.tempalm_report_type;
-            break;
-
-        case ALARM_FILP:                // 翻转告警
-        case ALARM_FILP_BACK:           // 翻转恢复告警
-            rpt = gConfigParam.imu_alm_config.imu_alm_report;
-            break;
-
         default:
             MY_LOG_ERR("unknown alarm type");
             return;
@@ -265,20 +185,6 @@ static void patm_upload_timer_handler(struct k_timer *timer)
 }
 
 /********************************************************************
-**函数名称:  temp_upload_timer_handler
-**入口参数:  timer     ---        定时器指针（输入）
-**出口参数:  无
-**函数功能:  温湿度定时上传定时器回调，仅投递CTRL消息
-**返 回 值:  无
-*********************************************************************/
-static void temp_upload_timer_handler(struct k_timer *timer)
-{
-    ARG_UNUSED(timer);
-
-    my_send_msg(MOD_CTRL, MOD_CTRL, MY_MSG_CTRL_TEMP_TIMER);
-}
-
-/********************************************************************
 **函数名称:  sensor_timer_reload
 **入口参数:  timer_id     ---      定时器ID（输入）
 **           interval_min ---      定时间隔，单位分钟（输入）
@@ -316,20 +222,6 @@ static void sensor_patm_timer_reload(void)
 }
 
 /********************************************************************
-**函数名称:  sensor_temp_timer_reload
-**入口参数:  无
-**出口参数:  无
-**函数功能:  根据当前配置重装温湿度上传定时器
-**返 回 值:  无
-*********************************************************************/
-static void sensor_temp_timer_reload(void)
-{
-    sensor_timer_reload(MY_TIMER_TEMP_UPLOAD,
-                        gConfigParam.temp_timer_config.interval_min,
-                        (TIMER_FUN)temp_upload_timer_handler);
-}
-
-/********************************************************************
 **函数名称:  sensor_sample_send_to_ble
 **入口参数:  msg_id     ---        目标消息ID（输入）
 **           data_ptr   ---        数据指针（输入）
@@ -345,181 +237,12 @@ static void sensor_sample_send_to_ble(uint32_t msg_id, const void *data_ptr, uin
         return;
     }
 
-    if (msg_id == MY_MSG_BLE_SENSOR_TH_SAMPLE)
-    {
-        memcpy(&g_temp_humi_sample, data_ptr, MIN(data_len, sizeof(g_temp_humi_sample)));
-    }
-    else if (msg_id == MY_MSG_BLE_SENSOR_BP_SAMPLE)
+    if (msg_id == MY_MSG_BLE_SENSOR_BP_SAMPLE)
     {
         memcpy(&g_barometer_sample, data_ptr, MIN(data_len, sizeof(g_barometer_sample)));
     }
 
     my_send_msg(MOD_CTRL, MOD_BLE, msg_id);
-}
-
-/********************************************************************
-**函数名称:  sensor_barometer_alarm_check
-**入口参数:  pressure_pa     ---        气压值（输入）
-**出口参数:  无
-**函数功能:  检查气压是否超出阈值并触发报警
-**返 回 值:  无
-*********************************************************************/
-void sensor_barometer_alarm_check(int32_t pressure_pa, uint32_t timestamp)
-{
-    static uint32_t s_last_timestamp = 0;
-    uint32_t timestamp_diff = 0;
-
-    if (gConfigParam.patalm_config.patalm_sw == 1)
-    {
-        timestamp_diff = timestamp - s_last_timestamp;
-        if (gConfigParam.patalm_config.patalm_low_threshold != 255 && pressure_pa < gConfigParam.patalm_config.patalm_low_threshold * 1000)
-        {
-            if ((gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_CONTINUOUS ||
-                gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_ALWAYS_ONLINE) &&
-                timestamp_diff >= gConfigParam.patalm_config.patalm_report_interval * 60 &&
-                gConfigParam.patalm_config.patalm_report_interval != 0)
-            {
-                s_barometer_alarm_state = NORMAL_PATM_TEMP_ALARM;
-            }
-
-            if (s_barometer_alarm_state != LOW_PATM_TEMP_ALARM)
-            {
-                s_barometer_alarm_state = LOW_PATM_TEMP_ALARM;
-                s_last_timestamp = timestamp;
-                send_alarm_message_to_lte(ALARM_LOW_PATM, NULL);
-            }
-        }
-        else if (gConfigParam.patalm_config.patalm_high_threshold != 255 && pressure_pa > gConfigParam.patalm_config.patalm_high_threshold * 1000)
-        {
-            if ((gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_CONTINUOUS ||
-                gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_ALWAYS_ONLINE) &&
-                timestamp_diff >= gConfigParam.patalm_config.patalm_report_interval * 60 &&
-                gConfigParam.patalm_config.patalm_report_interval != 0)
-            {
-                s_barometer_alarm_state = NORMAL_PATM_TEMP_ALARM;
-            }
-
-            if (s_barometer_alarm_state != HIGH_PATM_TEMP_ALARM)
-            {
-                s_barometer_alarm_state = HIGH_PATM_TEMP_ALARM;
-                s_last_timestamp = timestamp;
-                send_alarm_message_to_lte(ALARM_HIGH_PATM, NULL);
-            }
-        }
-        else
-        {
-            s_barometer_alarm_state = NORMAL_PATM_TEMP_ALARM;
-        }
-
-    }
-    else
-    {
-        s_barometer_alarm_state = NORMAL_PATM_TEMP_ALARM;
-    }
-}
-
-/********************************************************************
-**函数名称:  sensor_temp_humi_alarm_check
-**入口参数:  temp_humi     ---        温湿度湿度值（输入）
-**出口参数:  无
-**函数功能:  检查温度湿度是否超出阈值并触发报警
-**返 回 值:  无
-*********************************************************************/
-void sensor_temp_humi_alarm_check(int32_t temp_humi, uint32_t timestamp)
-{
-    int16_t temp_val = temp_humi & 0xFFFF;
-    int16_t humi_val = temp_humi >> 16;
-    static uint32_t s_last_temp_timestamp = 0;
-    static uint32_t s_last_humi_timestamp = 0;
-    uint32_t timestamp_diff = 0;
-
-    if (gConfigParam.tempalm_config.tempalm_sw == 1)
-    {
-        timestamp_diff = timestamp - s_last_temp_timestamp;
-        if (gConfigParam.tempalm_config.temp_low_threshold != 255 && temp_val < gConfigParam.tempalm_config.temp_low_threshold * 10)
-        {
-            if ((gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_CONTINUOUS ||
-                gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_ALWAYS_ONLINE) &&
-                timestamp_diff >= gConfigParam.tempalm_config.tempalm_report_interval * 60 &&
-                gConfigParam.tempalm_config.tempalm_report_interval != 0)
-            {
-                s_temp_alarm_state = NORMAL_PATM_TEMP_ALARM;
-            }
-
-            if (s_temp_alarm_state != LOW_PATM_TEMP_ALARM)
-            {
-                s_temp_alarm_state = LOW_PATM_TEMP_ALARM;
-                s_last_temp_timestamp = timestamp;
-                send_alarm_message_to_lte(ALARM_LOW_TEMP, NULL);
-            }
-        }
-        else if (gConfigParam.tempalm_config.temp_high_threshold != 255 && temp_val > gConfigParam.tempalm_config.temp_high_threshold * 10)
-        {
-            if ((gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_CONTINUOUS ||
-                gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_ALWAYS_ONLINE) &&
-                timestamp_diff >= gConfigParam.tempalm_config.tempalm_report_interval * 60 &&
-                gConfigParam.tempalm_config.tempalm_report_interval != 0)
-            {
-                s_temp_alarm_state = NORMAL_PATM_TEMP_ALARM;
-            }
-
-            if (s_temp_alarm_state != HIGH_PATM_TEMP_ALARM)
-            {
-                s_temp_alarm_state = HIGH_PATM_TEMP_ALARM;
-                s_last_temp_timestamp = timestamp;
-                send_alarm_message_to_lte(ALARM_HIGH_TEMP, NULL);
-            }
-        }
-        else
-        {
-            s_temp_alarm_state = NORMAL_PATM_TEMP_ALARM;
-        }
-
-        timestamp_diff = timestamp - s_last_humi_timestamp;
-        if (gConfigParam.tempalm_config.humi_low_threshold != 255 && humi_val < gConfigParam.tempalm_config.humi_low_threshold * 10)
-        {
-            if ((gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_CONTINUOUS ||
-                gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_ALWAYS_ONLINE) &&
-                timestamp_diff >= gConfigParam.tempalm_config.tempalm_report_interval * 60 &&
-                gConfigParam.tempalm_config.tempalm_report_interval != 0)
-            {
-                s_humi_alarm_state = NORMAL_PATM_TEMP_ALARM;
-            }
-            if (s_humi_alarm_state != LOW_PATM_TEMP_ALARM)
-            {
-                s_humi_alarm_state = LOW_PATM_TEMP_ALARM;
-                s_last_humi_timestamp = timestamp;
-                send_alarm_message_to_lte(ALARM_LOW_HUMI, NULL);
-            }
-        }
-        else if (gConfigParam.tempalm_config.humi_high_threshold != 255 && humi_val > gConfigParam.tempalm_config.humi_high_threshold * 10)
-        {
-            if ((gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_CONTINUOUS ||
-                gConfigParam.device_workmode_config.workmode_config.current_mode == MY_MODE_ALWAYS_ONLINE) &&
-                timestamp_diff >= gConfigParam.tempalm_config.tempalm_report_interval * 60 &&
-                gConfigParam.tempalm_config.tempalm_report_interval != 0)
-            {
-                s_humi_alarm_state = NORMAL_PATM_TEMP_ALARM;
-            }
-
-            if (s_humi_alarm_state != HIGH_PATM_TEMP_ALARM)
-            {
-                s_humi_alarm_state = HIGH_PATM_TEMP_ALARM;
-                s_last_humi_timestamp = timestamp;
-                send_alarm_message_to_lte(ALARM_HIGH_HUMI, NULL);
-            }
-        }
-        else
-        {
-            s_humi_alarm_state = NORMAL_PATM_TEMP_ALARM;
-
-        }
-    }
-    else
-    {
-        s_temp_alarm_state = NORMAL_PATM_TEMP_ALARM;
-        s_humi_alarm_state = NORMAL_PATM_TEMP_ALARM;
-    }
 }
 
 /********************************************************************
@@ -557,43 +280,7 @@ static int32_t sensor_collect_barometer(void)
     record.pressure_pa = (uint32_t)data.pressure_pa;
     sensor_sample_send_to_ble(MY_MSG_BLE_SENSOR_BP_SAMPLE, &record, sizeof(record));
 
-    sensor_barometer_alarm_check(record.pressure_pa, record.timestamp);
-
     return record.pressure_pa;
-}
-
-/********************************************************************
-**函数名称:  sensor_collect_temp_humi
-**入口参数:  无
-**出口参数:  无
-**函数功能:  采集一次温湿度并执行业务处理
-**返 回 值:  温湿度值（uint32_t）
-**          失败返回-1
-*********************************************************************/
-static int32_t sensor_collect_temp_humi(void)
-{
-    temp_humi_data_t data;
-    fs_temp_humi_record_t record;
-    temp_humi_result_t ret;
-
-    memset(&data, 0, sizeof(data));
-    memset(&record, 0, sizeof(record));
-
-    ret = temp_humi_api_read(&data);
-    if (ret != TEMP_HUMI_SUCCESS)
-    {
-        MY_LOG_ERR("temp_humi read fail:%d", ret);
-        return -1;
-    }
-
-    record.timestamp = (uint32_t)my_get_system_time_sec();
-    record.temperature_x10 = data.temperature / 10;
-    record.humidity_x10 = (uint16_t)(data.humidity / 10);
-    sensor_sample_send_to_ble(MY_MSG_BLE_SENSOR_TH_SAMPLE, &record, sizeof(record));
-
-    sensor_temp_humi_alarm_check(((record.humidity_x10 << 16) | (record.temperature_x10 & 0xFFFF)), record.timestamp);
-
-    return ((record.humidity_x10 << 16) | (record.temperature_x10 & 0xFFFF));
 }
 
 /********************************************************************
@@ -621,29 +308,6 @@ static void sensor_patm_read(void)
 }
 
 /********************************************************************
-**函数名称:  sensor_temp_read
-**入口参数:  无
-**出口参数:  无
-**函数功能:  读取当前温度湿度值并发送到BLE
-**返 回 值:  无
-*********************************************************************/
-static void sensor_temp_read(void)
-{
-    int32_t temp_humi = 0;
-    uint8_t resp_msg[70];
-
-    temp_humi = sensor_collect_temp_humi();
-    if (temp_humi < 0)
-    {
-        MY_LOG_ERR("sensor_collect_temp_humi fail");
-        send_ble_msg("NO Data!", strlen("NO Data!"));
-        return;
-    }
-    snprintf(resp_msg, sizeof(resp_msg), "Temperature: %.1f degrees Celsius,Humidity: %.1f %%", (temp_humi & 0xFFFF) * 0.1f, (temp_humi >> 16) * 0.1f);
-    send_ble_msg(resp_msg, strlen(resp_msg));
-}
-
-/********************************************************************
 **函数名称:  device_status_read
 **入口参数:  无
 **出口参数:  无
@@ -653,25 +317,11 @@ static void sensor_temp_read(void)
 static void device_status_read(void)
 {
     char send_buf[256];
-    char motion[20];        // 运动状态
     char net_signal[10];    // 网络信号
     char gnss_signal[15];   // GNSS信号
-    char temperature_str[30]; // 温度字符串
-    char humidity_str[30]; // 湿度字符串
     char pressure_str[30]; // 气压字符串
-    int32_t temp_humi = sensor_collect_temp_humi();
     int32_t pressure_pa = sensor_collect_barometer();
 
-    if (temp_humi < 0)
-    {
-        snprintf(temperature_str, sizeof(temperature_str), "-");
-        snprintf(humidity_str, sizeof(humidity_str), "-");
-    }
-    else
-    {
-        snprintf(temperature_str, sizeof(temperature_str), "%.1f(degrees Celsius)", (temp_humi & 0xFFFF) * 0.1f);
-        snprintf(humidity_str, sizeof(humidity_str), "%.1f%%(%%RH)", (temp_humi >> 16) * 0.1f);
-    }
     if (pressure_pa < 0)
     {
         snprintf(pressure_str, sizeof(pressure_str), "-");
@@ -721,31 +371,12 @@ static void device_status_read(void)
                 break;
         }
 
-        switch (g_gsensor_runtime_ctx.current_gsensor_state)
-        {
-            case STATE_STATIC:
-                memcpy(motion, "Static", sizeof("Static"));
-                break;
-
-            case STATE_MOTION:
-                memcpy(motion, "Motion", sizeof("Motion"));
-                break;
-
-            default:
-                memcpy(motion, "Unknown", sizeof("Unknown"));
-                break;
-        }
-
-        snprintf(send_buf, sizeof(send_buf), "Battery:%d%%(%s);Network:%s(%s);GNSS:%s(%s); \
-            Tamper:%s;Pull:%s;Motion:%s(%.2f KM/h);Temperature:%s;Humidity:%s;Pressure:%s",
+        snprintf(send_buf, sizeof(send_buf), "Battery:%d%%(%s);Network:%s(%s);GNSS:%s(%s);Pressure:%s",
             get_show_percent(),
             g_charg_state == NO_CHARGING ? "Discharging" : "Charging",
             g_lte_net_flag == 0 ? "Disconnect" : "Connect",
             net_signal, gnss_signal, g_lte_gps_signal,
-            get_light_tamper_state() ? "Remove" : "Normal",
-            get_light_pull_state() ? "Remove" : "Normal",
-            motion, g_location_point.speed,
-            temperature_str, humidity_str, pressure_str);
+            pressure_str);
 
         send_ble_msg(send_buf, strlen(send_buf));
 }
@@ -761,7 +392,6 @@ static void sensor_module_init(void)
 {
     struct barometer_config barometer_cfg;
     barometer_result_t barometer_ret;
-    temp_humi_result_t temp_humi_ret;
 
     memset(&barometer_cfg, 0, sizeof(barometer_cfg));
     // 初始化气压传感器采样参数
@@ -777,15 +407,7 @@ static void sensor_module_init(void)
         MY_LOG_ERR("barometer init fail:%d", barometer_ret);
     }
 
-    // 初始化温湿度传感器
-    temp_humi_ret = temp_humi_api_init();
-    if (temp_humi_ret != TEMP_HUMI_SUCCESS)
-    {
-        MY_LOG_ERR("temp_humi init fail:%d", temp_humi_ret);
-    }
-
     sensor_patm_timer_reload();
-    sensor_temp_timer_reload();
 }
 
 /* --- 休眠唤醒功能实现 --- */
@@ -839,7 +461,6 @@ void go_to_system_off(void)
 {
     MY_LOG_INF("Config wakeup pin and enter System OFF");
 
-    my_gsensor_save_imu_bias();
 
     k_sleep(K_SECONDS(2));// 确保上面的日志有打印出来
 
@@ -949,149 +570,13 @@ static void key_timer_handler(struct k_timer *timer)
 }
 
 /********************************************************************
-**函数名称:  light_sensor_timer_handler
-**入口参数:  timer    ---   定时器指针
-**出口参数:  无
-**函数功能:  拆壳光感定时器回调
-**返 回 值:  无
-**功能描述:  1. 状态变化时发送消息到主任务
-*********************************************************************/
-static void light_tamper_sensor_timer_handler(struct k_timer *timer)
-{
-    ARG_UNUSED(timer);
-
-    int level = gpio_pin_get(light_tamper_det.port, light_tamper_det.pin);
-    bool new_state = (level == 1);
-
-    if (new_state != light_tamper_sensor.state)
-    {
-        light_tamper_sensor.state = new_state;
-        // MY_LOG_INF("Light state changed: %s", new_state ? "LIGHT" : "DARK");
-
-        /* 发送光感状态变化消息到主任务 */
-        msg_t msg;
-        msg.msgID = new_state ? MY_MSG_CTRL_LIGHT_TAMPER_SENSOR_BRIGHT : MY_MSG_CTRL_LIGHT_TAMPER_SENSOR_DARK;
-        msg.pData = NULL;
-        msg.DataLen = 0;
-        my_send_msg_data(MOD_CTRL, MOD_CTRL, &msg);
-    }
-}
-
-/********************************************************************
-**函数名称:  light_sensor_edge_handler
-**入口参数:  无
-**出口参数:  无
-**函数功能:  光感双边沿中断处理
-**返 回 值:  无
-**功能描述:  1. 读取光感GPIO引脚电平，判断当前光照状态（高电平=有光）
-**          2. 若状态发生变化：
-**             - 从无光→有光：启动定时器，超时时间为T1（从暗处到亮处的确认延时）
-**             - 从有光→无光：启动定时器，超时时间为T2（从亮处到暗处的确认延时）
-**          3. 若状态未变化：停止定时器（消抖复位）
-**          4. 注意：本函数仅负责定时器控制，状态更新由定时器回调完成
-**          5. 定时器超时后触发状态确认消息（MY_MSG_CTRL_LIGHT_SENSOR_BRIGHT/DARK）
-*********************************************************************/
-static void light_tamper_sensor_edge_handler(void)
-{
-    int level = gpio_pin_get(light_tamper_det.port, light_tamper_det.pin);
-    uint16_t t1 = gConfigParam.ltint_config.T1;
-    uint16_t t2 = gConfigParam.ltint_config.T2;
-    bool new_state = (level == 1);
-
-    if (new_state != light_tamper_sensor.state)
-    {
-        if (light_tamper_sensor.state == false)
-        {
-            k_timer_start(&light_tamper_sensor.timer, K_MSEC(t1), K_NO_WAIT);
-        }
-        else
-        {
-            k_timer_start(&light_tamper_sensor.timer, K_MSEC(t2), K_NO_WAIT);
-        }
-    }
-    else
-    {
-        k_timer_stop(&light_tamper_sensor.timer);
-    }
-}
-
-/********************************************************************
-**函数名称:  light_pull_sensor_timer_handler
-**入口参数:  timer    ---   定时器指针
-**出口参数:  无
-**函数功能:  拆卸光感定时器回调
-**返 回 值:  无
-**功能描述:  1. 状态变化时发送消息到主任务
-*********************************************************************/
-static void light_pull_sensor_timer_handler(struct k_timer *timer)
-{
-    ARG_UNUSED(timer);
-
-    int level = gpio_pin_get(light_pull_det.port, light_pull_det.pin);
-    bool new_state = (level == 1);
-
-    if (new_state != light_pull_sensor.state)
-    {
-        light_pull_sensor.state = new_state;
-        // MY_LOG_INF("Light state changed: %s", new_state ? "LIGHT" : "DARK");
-
-        /* 发送光感状态变化消息到主任务 */
-        msg_t msg;
-        msg.msgID = new_state ? MY_MSG_CTRL_LIGHT_PULL_SENSOR_BRIGHT : MY_MSG_CTRL_LIGHT_PULL_SENSOR_DARK;
-        msg.pData = NULL;
-        msg.DataLen = 0;
-        my_send_msg_data(MOD_CTRL, MOD_CTRL, &msg);
-    }
-}
-
-/********************************************************************
-**函数名称:  light_pull_sensor_edge_handler
-**入口参数:  无
-**出口参数:  无
-**函数功能:  拆卸光感双边沿中断处理
-**返 回 值:  无
-**功能描述:  1. 读取拆卸光感GPIO引脚电平，判断当前拆卸状态（高电平=有拆卸）
-**          2. 若状态发生变化：
-**             - 从无拆卸→有拆卸：启动定时器，超时时间为T1（从无拆卸到有拆卸的确认延时）
-**             - 从有拆卸→无拆卸：启动定时器，超时时间为T2（从有拆卸到无拆卸的确认延时）
-**          3. 若状态未变化：停止定时器（消抖复位）
-**          4. 注意：本函数仅负责定时器控制，状态更新由定时器回调完成
-**          5. 定时器超时后触发状态确认消息（MY_MSG_CTRL_LIGHT_PULL_SENSOR_BRIGHT/DARK）
-*********************************************************************/
-static void light_pull_sensor_edge_handler(void)
-{
-    int level = gpio_pin_get(light_pull_det.port, light_pull_det.pin);
-    uint16_t t1 = gConfigParam.ltint_config.T1;
-    uint16_t t2 = gConfigParam.ltint_config.T2;
-    bool new_state = (level == 1);
-
-    if (new_state != light_pull_sensor.state)
-    {
-        if (light_pull_sensor.state == false)
-        {
-            k_timer_start(&light_pull_sensor.timer, K_MSEC(t1), K_NO_WAIT);
-        }
-        else
-        {
-            k_timer_start(&light_pull_sensor.timer, K_MSEC(t2), K_NO_WAIT);
-        }
-    }
-    else
-    {
-        k_timer_stop(&light_pull_sensor.timer);
-    }
-}
-
-/********************************************************************
 **函数名称:  misc_io_isr
 **入口参数:  dev      ---   GPIO 设备指针
 **           cb       ---   回调结构体指针
 **           pins     ---   触发中断的引脚位图
 **出口参数:  无
-**函数功能:  杂项 IO 中断服务程序
+**函数功能:  杂项 IO 中断服务程序，处理 FUN_KEY 按键中断
 **返 回 值:  无
-**功能描述:  1. 处理 FUN_KEY 按键中断
-**           2. 处理光感检测中断
 *********************************************************************/
 static void misc_io_isr(const struct device *dev,
                    struct gpio_callback *cb,
@@ -1108,40 +593,25 @@ static void misc_io_isr(const struct device *dev,
             k_timer_start(&key_ctrl_t.timer, K_MSEC(KEY_POLL_PERIOD_MS), K_MSEC(KEY_POLL_PERIOD_MS));
         }
     }
-
-    if (pins & BIT(light_tamper_det.pin))
-    {
-        /* 双边沿触发，调用光感处理函数 */
-        light_tamper_sensor_edge_handler();
-    }
-
-    if (pins & BIT(light_pull_det.pin))
-    {
-        /* 双边沿触发，调用拆卸光感处理函数 */
-        light_pull_sensor_edge_handler();
-    }
 }
 
 /********************************************************************
 **函数名称:  misc_io_init
 **入口参数:  无
 **出口参数:  无
-**函数功能:  初始化按键、光感检测 IO
+**函数功能:  初始化 FUN_KEY 按键 IO
 **返 回 值:  0 表示成功，负值表示失败
 **功能描述:  1. 检查 GPIO 设备就绪状态
 **           2. 配置 fun_key 为输入（内部下拉）
-**           3. 配置 light_tamper_det 为输入
-**           4. 配置引脚中断触发
-**           5. 初始化按键定时器并注册中断回调
+**           3. 配置按键中断触发
+**           4. 初始化按键定时器并注册中断回调
 *********************************************************************/
 static int misc_io_init(void)
 {
     int ret;
-    int light_initial_level;
     uint32_t fun_key_count = 0;
 
-    if (!device_is_ready(fun_key.port) ||
-        !device_is_ready(light_tamper_det.port))
+    if (!device_is_ready(fun_key.port))
     {
         return -ENODEV;
     }
@@ -1168,22 +638,6 @@ static int misc_io_init(void)
         }
     }
 
-    /* 配置为输入（light_tamper_det 配置为输入） */
-    ret = gpio_pin_configure_dt(&light_tamper_det, GPIO_INPUT);
-    if (ret)
-    {
-        MY_LOG_ERR("Failed to configure light_tamper_det: %d", ret);
-        return ret;
-    }
-
-    /* 配置为输入（light_pull_det 配置为输入） */
-    ret = gpio_pin_configure_dt(&light_pull_det, GPIO_INPUT);
-    if (ret)
-    {
-        MY_LOG_ERR("Failed to configure light_pull_det: %d", ret);
-        return ret;
-    }
-
     /* 配置按键中断：上升沿触发 */
     ret = gpio_pin_interrupt_configure_dt(&fun_key, GPIO_INT_EDGE_RISING);
     if (ret)
@@ -1192,46 +646,11 @@ static int misc_io_init(void)
         return ret;
     }
 
-    /* 拆壳光感检测配置：配置光感中断：双边沿触发 */
-    ret = gpio_pin_interrupt_configure_dt(&light_tamper_det, GPIO_INT_EDGE_BOTH);
-    if (ret)
-    {
-        MY_LOG_ERR("Failed to configure light_tamper_det interrupt: %d", ret);
-        return ret;
-    }
-
-    /* 初始化拆壳光感定时器和状态 */
-    k_timer_init(&light_tamper_sensor.timer, light_tamper_sensor_timer_handler, NULL);
-    light_tamper_sensor.state = false;
-    /* 读取初始状态 */
-    light_initial_level = gpio_pin_get(light_tamper_det.port, light_tamper_det.pin);
-    light_tamper_sensor.state = (light_initial_level == 1);
-    MY_LOG_INF("Light_tamper state: %s", light_tamper_sensor.state ? "LIGHT" : "DARK");
-
-    /* 拆卸光感检测配置：配置光感中断：双边沿触发 */
-    ret = gpio_pin_interrupt_configure_dt(&light_pull_det, GPIO_INT_EDGE_BOTH);
-    if (ret)
-    {
-        MY_LOG_ERR("Failed to configure light_pull_det interrupt: %d", ret);
-        return ret;
-    }
-
-    /* 初始化拆卸光感定时器和状态 */
-    k_timer_init(&light_pull_sensor.timer, light_pull_sensor_timer_handler, NULL);
-    light_pull_sensor.state = false;
-    /* 读取初始状态 */
-    light_initial_level = gpio_pin_get(light_pull_det.port, light_pull_det.pin);
-    light_pull_sensor.state = (light_initial_level == 1);
-    MY_LOG_INF("Light_pull state: %s", light_pull_sensor.state ? "LIGHT" : "DARK");
-
     /* 初始化按键定时器 */
     key_timer_init();
 
-    /* 一个回调处理两个引脚 */
-    gpio_init_callback(&s_misc_io_cb, misc_io_isr,
-                       BIT(fun_key.pin) |
-                       BIT(light_tamper_det.pin) |
-                       BIT(light_pull_det.pin));
+    /* 注册按键中断回调 */
+    gpio_init_callback(&s_misc_io_cb, misc_io_isr, BIT(fun_key.pin));
     gpio_add_callback(fun_key.port, &s_misc_io_cb);
 
     return 0;
@@ -1695,54 +1114,16 @@ static void my_ctrl_task(void *p1, void *p2, void *p3)
                 }
                 break;
 
-            case MY_MSG_CTRL_LIGHT_TAMPER_SENSOR_BRIGHT:
-                MY_LOG_INF("Light tamper sensor detected: BRIGHT");
-                //上报拆壳检测告警
-                if(gConfigParam.remalm_config.remalm_sw)
-                {
-                    send_alarm_message_to_lte(ALARM_CASE_OPEN, NULL);
-                }
-                break;
-
-            case MY_MSG_CTRL_LIGHT_TAMPER_SENSOR_DARK:
-                MY_LOG_INF("Light tamper sensor detected: DARK");
-                break;
-
-            case MY_MSG_CTRL_LIGHT_PULL_SENSOR_BRIGHT:
-                MY_LOG_INF("Light pull sensor detected: BRIGHT");
-                // 上报拆卸报警
-                if(gConfigParam.pullalm_config.pullalm_sw)
-                {
-                    send_alarm_message_to_lte(ALARM_REMOVE, NULL);
-                }
-                break;
-
-            case MY_MSG_CTRL_LIGHT_PULL_SENSOR_DARK:
-                MY_LOG_INF("Light pull sensor detected: DARK");
-                break;
-
             case MY_MSG_CTRL_PATM_TIMER:
                 sensor_collect_barometer();
-                break;
-
-            case MY_MSG_CTRL_TEMP_TIMER:
-                sensor_collect_temp_humi();
                 break;
 
             case MY_MSG_CTRL_PATM_RELOAD:
                 sensor_patm_timer_reload();
                 break;
 
-            case MY_MSG_CTRL_TEMP_RELOAD:
-                sensor_temp_timer_reload();
-                break;
-
             case MY_MSG_CTRL_PATM_READ:
                 sensor_patm_read();
-                break;
-
-            case MY_MSG_CTRL_TEMP_READ:
-                sensor_temp_read();
                 break;
 
             case MY_MSG_CTRL_STATUS_READ:

@@ -91,82 +91,6 @@ const ble_log_config_t gDefaultBleLogConfig =
     }
 };
 
-const work_mode_config_t gDefaultWorkModeConfig =
-{
-    .flag = FLAG_VALID,
-    .workmode_config =                          // 默认工作模式配置
-    {
-        .current_mode = MY_MODE_SMART,          // 默认智能模式
-        .continuous_tracking = // 连续追踪模式
-        {
-            .reporting_interval_sec = 30,      // 默认30秒上报一次
-            .reporting_interval_dis = 100,    // 默认100米上报一次
-        },
-        .long_battery = // 长续航模式
-        {
-            .reporting_interval_min = 240,      // 默认240分钟上报一次
-            .start_time = "0001",               // 默认00:01开始上报
-            .gnss_sw = 1,                       // 默认GNSS开启(ON)
-        },
-        .intelligent = // 智能模式
-        {
-            .sub_mode = 5,                      // 默认子模式5（Cell+GNSS常开/秒）
-            .static_interval = 10,              // 默认静止间隔10（子模式5下单位为秒）
-            .moving_interval = 10,              // 默认运动间隔10（子模式5下单位为秒）
-        },
-    }
-};
-
-const remalm_config_t gDefaultRemAlmConfig =
-{
-    .flag = FLAG_VALID,
-    .remalm_sw = 0,                             /* 默认关闭 */
-    .remalm_mode = REPORT_MODE_GPRS,            /* 默认GPRS */
-};
-
-const pullalm_config_t gDefaultPullAlmConfig =
-{
-    .flag = FLAG_VALID,
-    .pullalm_sw = 0,                             /* 默认关闭 */
-    .pullalm_mode = REPORT_MODE_GPRS,            /* 默认GPRS */
-};
-
-const patalm_config_t gDefaultPatAlmConfig =
-{
-    .flag = FLAG_VALID,
-    .patalm_sw = 0,                             /* 默认关闭 */
-    .patalm_low_threshold = 255,                /* 默认低压不报警 */
-    .patalm_high_threshold = 255,               /* 默认高压不报警 */
-    .patalm_report_type = REPORT_MODE_GPRS,     /* 默认GPRS */
-    .patalm_report_interval = 0,                /* 默认不重复上报 */
-};
-
-const tempalm_config_t gDefaultTempAlmConfig =
-{
-    .flag = FLAG_VALID,
-    .tempalm_sw = 0,                             /* 默认关闭 */
-    .temp_low_threshold = 255,                   /* 默认低温不报警 */
-    .temp_high_threshold = 255,                  /* 默认高温不报警 */
-    .humi_low_threshold = 255,                   /* 默认低湿度不报警 */
-    .humi_high_threshold = 255,                  /* 默认高湿度不报警 */
-    .tempalm_report_type = REPORT_MODE_GPRS,     /* 默认GPRS */
-    .tempalm_report_interval = 0,                /* 默认不重复上报 */
-};
-
-const mot_det_config_t gDefaultMotDetConfig =
-{
-    .flag = FLAG_VALID,
-    .motdet_vibration = 5,           /* 默认5次 */
-    .motdet_duration = 10,           /* 默认10秒 */
-};
-
-const motdetalm_config_t gDefaultMotDetAlmConfig =
-{
-    .flag = FLAG_VALID,
-    .motdetalm_sw = 1,                                    /* 默认开启 */
-    .motdetalm_report_type = REPORT_MODE_GPRS,            /* 默认GPRS */
-};
-
 const bat_level_config_t gDefaultBatlevelConfig =
 {
     .flag = FLAG_VALID,
@@ -179,11 +103,6 @@ const bat_level_config_t gDefaultBatlevelConfig =
     .chargesta_report = REPORT_MODE_GPRS,             /* 默认GPRS */
 };
 
-const startr_config_t gDefaultStartrConfig =
-{
-    .flag = FLAG_VALID,
-    .startr_sw = 0,                    /* 默认关闭 */
-};
 
 const pwrlimit_config_t gDefaultPWRlimitConfig =
 {
@@ -191,13 +110,6 @@ const pwrlimit_config_t gDefaultPWRlimitConfig =
     .pwrlimit_sw = 0,                   /* 默认允许开机 */
 };
 
-const lprunning_config_t gDefaultlprunningConfig =
-{
-    .flag = FLAG_VALID,
-    .lprunning_sw = 0,                   /* 默认关闭 */
-    .lprunning_threshold = 20,           /* 默认20%电量阈值 */
-    .lprunning_interval = 24,            /* 默认24小时唤醒间隔 */
-};
 
 const bt_updata_config_t gDefaultBtUpdataConfig =
 {
@@ -238,13 +150,6 @@ const led_config_t gDefaultLedConfig =
     .led_display = 1,                  /* 默认模式1 */
 };
 
-const ltint_config_t gDefaultLtintConfig =
-{
-    .flag = FLAG_VALID,
-    .T1 = 1000,                          /* 默认1000ms */
-    .T2 = 1000,                          /* 默认1000ms */
-};
-
 const buzzer_config_t gDefaultBuzzerConfig =
 {
     .flag = FLAG_VALID,
@@ -265,33 +170,7 @@ const patm_timer_config_t gDefaultPatmTimerConfig =
     .wakeup_cell_sw = 0,        // 默认不因气压缓存主动拉起LTE
 };
 
-const temp_timer_config_t gDefaultTempTimerConfig =
-{
-    .flag = FLAG_VALID,         // 默认配置有效
-    .interval_min = 20,         // 默认每20分钟采集/上报一次温湿度
-    .wakeup_cell_sw = 0,        // 默认不因温湿度缓存主动拉起LTE
-};
 
-const imu_alm_config_t gDefaultImuAlmConfig =
-{
-    .flag = FLAG_VALID,             // 默认配置有效
-    .imu_alm_sw = 1,                // 默认开启
-    .imu_alm_report = 1,            // 默认GPRS
-    .imu_roll_threshold = 30,       // 默认报警阈值30度
-    .imu_pitch_threshold = 25,      // 默认报警阈值25度
-    .imu_yaw_threshold = 255,       // 默认不报警
-    .imu_duration_time = 3,         // 默认3秒
-    .imu_duration_count = 3,        // 默认3次
-    .recover_time = 10,             // 默认10秒
-};
-
-const imu_zero_bias_config_t gDefaultImuZeroBiasConfig =
-{
-    .flag = FLAG_VALID,             // 默认配置有效
-    .gyro_bias_x = 0.0f,            // 默认陀螺仪零偏估计 X (rad/s, 在线逐步追踪)
-    .gyro_bias_y = 0.0f,            // 默认陀螺仪零偏估计 Y (rad/s)
-    .gyro_bias_z = 0.0f,            // 默认陀螺仪零偏估计 Z (rad/s)
-};
 /********************************************************************
 **函数名称:  my_user_data_storage_init
 **入口参数:  无
@@ -500,121 +379,6 @@ void my_param_load_config(void)
         MY_LOG_INF("BLE log config loaded: global_en=%d", gConfigParam.ble_log_config.global_en);
     }
 
-    //--------Load Device Workmode Config ---------------------
-    length = sizeof(work_mode_config_t);
-    ret = my_user_data_read(ZMS_ID_WORK_MODE_CONFIG, &gConfigParam.device_workmode_config, length);
-    if (gConfigParam.device_workmode_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.device_workmode_config, &gDefaultWorkModeConfig, length);
-        MY_LOG_INF("Device workmode config not found. Use default.");
-    }
-
-    //--------Load Remote Alarm Config ---------------------
-    length = sizeof(remalm_config_t);
-    ret = my_user_data_read(ZMS_ID_REM_ALM_CONFIG, &gConfigParam.remalm_config, length);
-    if (gConfigParam.remalm_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.remalm_config, &gDefaultRemAlmConfig, length);
-        MY_LOG_INF("Remote alarm config not found. Use default:remalm_mode(%d), remalm_sw(%d)",
-                    gConfigParam.remalm_config.remalm_mode, gConfigParam.remalm_config.remalm_sw);
-    }
-    else
-    {
-        MY_LOG_INF("Remote alarm config loaded: remalm_mode(%d), remalm_sw(%d)",
-                    gConfigParam.remalm_config.remalm_mode, gConfigParam.remalm_config.remalm_sw);
-    }
-
-    //--------Load Pull Alarm Config ---------------------
-    length = sizeof(pullalm_config_t);
-    ret = my_user_data_read(ZMS_ID_PULL_ALM_CONFIG, &gConfigParam.pullalm_config, length);
-    if (gConfigParam.pullalm_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.pullalm_config, &gDefaultPullAlmConfig, length);
-        MY_LOG_INF("Pull alarm config not found. Use default:pullalm_mode(%d), pullalm_sw(%d)",
-                    gConfigParam.pullalm_config.pullalm_mode, gConfigParam.pullalm_config.pullalm_sw);
-    }
-    else
-    {
-        MY_LOG_INF("Pull alarm config loaded: pullalm_mode(%d), pullalm_sw(%d)",
-                    gConfigParam.pullalm_config.pullalm_mode, gConfigParam.pullalm_config.pullalm_sw);
-    }
-
-    //--------Load Patalm Config ---------------------
-    length = sizeof(patalm_config_t);
-    ret = my_user_data_read(ZMS_ID_PATMALM_CONFIG, &gConfigParam.patalm_config, length);
-    if (gConfigParam.patalm_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.patalm_config, &gDefaultPatAlmConfig, length);
-        MY_LOG_INF("Pat alarm config not found. Use default:patalm_low_threshold(%d), patalm_high_threshold(%d), patalm_report_type(%d), patalm_report_interval(%d)",
-                    gConfigParam.patalm_config.patalm_low_threshold,
-                    gConfigParam.patalm_config.patalm_high_threshold,
-                    gConfigParam.patalm_config.patalm_report_type,
-                    gConfigParam.patalm_config.patalm_report_interval);
-    }
-    else
-    {
-        MY_LOG_INF("Pat alarm config loaded: patalm_low_threshold(%d), patalm_high_threshold(%d), patalm_report_type(%d), patalm_report_interval(%d)",
-                    gConfigParam.patalm_config.patalm_low_threshold,
-                    gConfigParam.patalm_config.patalm_high_threshold,
-                    gConfigParam.patalm_config.patalm_report_type,
-                    gConfigParam.patalm_config.patalm_report_interval);
-    }
-
-    //--------Load Temp Alm Config ---------------------
-    length = sizeof(tempalm_config_t);
-    ret = my_user_data_read(ZMS_ID_TEMPALM_CONFIG, &gConfigParam.tempalm_config, length);
-    if (gConfigParam.tempalm_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.tempalm_config, &gDefaultTempAlmConfig, length);
-        MY_LOG_INF("Temp alarm config not found. Use default:temp_low_threshold(%d), temp_high_threshold(%d), humi_low_threshold(%d), humi_high_threshold(%d), tempalm_report_type(%d), tempalm_report_interval(%d)",
-                    gConfigParam.tempalm_config.temp_low_threshold,
-                    gConfigParam.tempalm_config.temp_high_threshold,
-                    gConfigParam.tempalm_config.humi_low_threshold,
-                    gConfigParam.tempalm_config.humi_high_threshold,
-                    gConfigParam.tempalm_config.tempalm_report_type,
-                    gConfigParam.tempalm_config.tempalm_report_interval);
-    }
-    else
-    {
-        MY_LOG_INF("Temp alarm config loaded: temp_low_threshold(%d), temp_high_threshold(%d), humi_low_threshold(%d), humi_high_threshold(%d), tempalm_report_type(%d), tempalm_report_interval(%d)",
-                    gConfigParam.tempalm_config.temp_low_threshold,
-                    gConfigParam.tempalm_config.temp_high_threshold,
-                    gConfigParam.tempalm_config.humi_low_threshold,
-                    gConfigParam.tempalm_config.humi_high_threshold,
-                    gConfigParam.tempalm_config.tempalm_report_type,
-                    gConfigParam.tempalm_config.tempalm_report_interval);
-    }
-
-    //--------Load Mot Det Config ---------------------
-    length = sizeof(mot_det_config_t);
-    ret = my_user_data_read(ZMS_ID_MOT_DET_CONFIG, &gConfigParam.motdet_config, length);
-    if (gConfigParam.motdet_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.motdet_config, &gDefaultMotDetConfig, length);
-        MY_LOG_INF("Mot det config not found. Use default:motdet_vibration(%d), motdet_duration(%d)",
-                    gConfigParam.motdet_config.motdet_vibration, gConfigParam.motdet_config.motdet_duration);
-    }
-    else
-    {
-        MY_LOG_INF("Mot det config loaded: motdet_vibration(%d), motdet_duration(%d)",
-                    gConfigParam.motdet_config.motdet_vibration, gConfigParam.motdet_config.motdet_duration);
-    }
-
-    //--------Load Mot Det Alm Config ---------------------
-    length = sizeof(motdetalm_config_t);
-    ret = my_user_data_read(ZMS_ID_MOTDETALM_CONFIG, &gConfigParam.motdetalm_config, length);
-    if (gConfigParam.motdetalm_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.motdetalm_config, &gDefaultMotDetAlmConfig, length);
-        MY_LOG_INF("Mot det alarm config not found. Use default:motdetalm_sw(%d), motdetalm_report_type(%d)",
-                    gConfigParam.motdetalm_config.motdetalm_sw, gConfigParam.motdetalm_config.motdetalm_report_type);
-    }
-    else
-    {
-        MY_LOG_INF("Mot det alarm config loaded: motdetalm_sw(%d), motdetalm_report_type(%d)",
-                    gConfigParam.motdetalm_config.motdetalm_sw, gConfigParam.motdetalm_config.motdetalm_report_type);
-    }
-
     //--------Load Batlevel Config ---------------------
     length = sizeof(bat_level_config_t);
     ret = my_user_data_read(ZMS_ID_BAT_LEVEL_CONFIG, &gConfigParam.batlevel_config, length);
@@ -638,19 +402,6 @@ void my_param_load_config(void)
                     gConfigParam.batlevel_config.chargesta_report);
     }
 
-    //--------Load Startr Config ---------------------
-    length = sizeof(startr_config_t);
-    ret = my_user_data_read(ZMS_ID_STARTR_CONFIG, &gConfigParam.startr_config, length);
-    if (gConfigParam.startr_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.startr_config, &gDefaultStartrConfig, length);
-        MY_LOG_INF("Startr config not found. Use default:startr_sw(%d)", gConfigParam.startr_config.startr_sw);
-    }
-    else
-    {
-        MY_LOG_INF("Startr config loaded: startr_sw(%d)", gConfigParam.startr_config.startr_sw);
-    }
-
     //--------Load PWRLimit Config ---------------------
     length = sizeof(pwrlimit_config_t);
     ret = my_user_data_read(ZMS_ID_PWRLIMIT_CONFIG, &gConfigParam.pwrlimit_config, length);
@@ -662,25 +413,6 @@ void my_param_load_config(void)
     else
     {
         MY_LOG_INF("PWRLimit config loaded: pwrlimit_sw(%d)", gConfigParam.pwrlimit_config.pwrlimit_sw);
-    }
-
-    //--------Load LPSLEEP Config ---------------------
-    length = sizeof(lprunning_config_t);
-    ret = my_user_data_read(ZMS_ID_LPSLEEP_CONFIG, &gConfigParam.lprunning_config, length);
-    if (gConfigParam.lprunning_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.lprunning_config, &gDefaultlprunningConfig, length);
-        MY_LOG_INF("LPSLEEP config not found. Use default:sw(%d),threshold(%d),interval(%d)",
-                    gConfigParam.lprunning_config.lprunning_sw,
-                    gConfigParam.lprunning_config.lprunning_threshold,
-                    gConfigParam.lprunning_config.lprunning_interval);
-    }
-    else
-    {
-        MY_LOG_INF("LPSLEEP config loaded: sw(%d),threshold(%d),interval(%d)",
-                    gConfigParam.lprunning_config.lprunning_sw,
-                    gConfigParam.lprunning_config.lprunning_threshold,
-                    gConfigParam.lprunning_config.lprunning_interval);
     }
 
     //--------Load BTUPDATA Config ---------------------
@@ -756,18 +488,6 @@ void my_param_load_config(void)
         MY_LOG_INF("Led config loaded: led_display(%d)", gConfigParam.led_config.led_display);
     }
 
-    //--------Load Ltint Config ---------------------
-    length = sizeof(ltint_config_t);
-    ret = my_user_data_read(ZMS_ID_LTINT_CONFIG, &gConfigParam.ltint_config, length);
-    if (gConfigParam.ltint_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.ltint_config, &gDefaultLtintConfig, length);
-        MY_LOG_INF("Ltint Config not found. Use default:T1(%d), T2(%d)", gConfigParam.ltint_config.T1, gConfigParam.ltint_config.T2);
-    }
-    else
-    {
-        MY_LOG_INF("Ltint Config loaded: T1(%d), T2(%d)", gConfigParam.ltint_config.T1, gConfigParam.ltint_config.T2);
-    }
 
     //--------Load Buzzer Config ---------------------
     length = sizeof(buzzer_config_t);
@@ -812,54 +532,7 @@ void my_param_load_config(void)
                    gConfigParam.patm_timer_config.wakeup_cell_sw);
     }
 
-    //--------Load Temp Timer Config ---------------------
-    length = sizeof(temp_timer_config_t);
-    ret = my_user_data_read(ZMS_ID_TEMP_TIMER_CONFIG, &gConfigParam.temp_timer_config, length);
-    if (gConfigParam.temp_timer_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.temp_timer_config, &gDefaultTempTimerConfig, length);
-        MY_LOG_INF("Temp timer config not found. Use default:T(%d), C(%d)",
-                   gConfigParam.temp_timer_config.interval_min,
-                   gConfigParam.temp_timer_config.wakeup_cell_sw);
-    }
-    else
-    {
-        MY_LOG_INF("Temp timer config loaded:T(%d), C(%d)",
-                   gConfigParam.temp_timer_config.interval_min,
-                   gConfigParam.temp_timer_config.wakeup_cell_sw);
-    }
 
-    //--------Load Imu Alm Config ---------------------
-    length = sizeof(imu_alm_config_t);
-    ret = my_user_data_read(ZMS_ID_IMU_ALM_CONFIG, &gConfigParam.imu_alm_config, length);
-    if (gConfigParam.imu_alm_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.imu_alm_config, &gDefaultImuAlmConfig, length);
-        MY_LOG_INF("Imu alm config not found. Use default.");
-    }
-    else
-    {
-        MY_LOG_INF("Imu alm config loaded");
-    }
-
-    //--------Load Imu Zero Bias Config ---------------------
-    length = sizeof(imu_zero_bias_config_t);
-    ret = my_user_data_read(ZMS_ID_IMU_ZERO_BIAS_CONFIG, &gConfigParam.imu_zero_bias_config, length);
-    if (gConfigParam.imu_zero_bias_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.imu_zero_bias_config, &gDefaultImuZeroBiasConfig, length);
-        MY_LOG_INF("Imu zero bias config not found. Use default: gyro_bias_x(%f), gyro_bias_y(%f), gyro_bias_z(%f)",
-                   gConfigParam.imu_zero_bias_config.gyro_bias_x,
-                   gConfigParam.imu_zero_bias_config.gyro_bias_y,
-                   gConfigParam.imu_zero_bias_config.gyro_bias_z);
-    }
-    else
-    {
-        MY_LOG_INF("Imu zero bias config loaded: gyro_bias_x(%f), gyro_bias_y(%f), gyro_bias_z(%f)",
-                   gConfigParam.imu_zero_bias_config.gyro_bias_x,
-                   gConfigParam.imu_zero_bias_config.gyro_bias_y,
-                   gConfigParam.imu_zero_bias_config.gyro_bias_z);
-    }
 }
 
 /********************************************************************
