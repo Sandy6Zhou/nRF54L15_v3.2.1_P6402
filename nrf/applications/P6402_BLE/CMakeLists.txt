@@ -34,6 +34,7 @@ target_sources(app PRIVATE
   src/my_lte.c
   src/my_uart.c
   src/my_wifi.c
+  src/my_gprs.c
   src/my_gsensor.c
   src/my_ctrl.c
   src/my_battery.c

@@ -12,6 +12,7 @@ static k_tid_t s_my_ble_task_id = NULL;
 static k_tid_t s_my_ctrl_task_id = NULL;
 static k_tid_t s_my_lte_task_id = NULL;
 static k_tid_t s_my_wifi_task_id = NULL;
+static k_tid_t s_my_gprs_task_id = NULL;
 static k_tid_t s_my_gsensor_task_id = NULL;
 
 static k_tid_t s_my_task_info[MAX_MY_MOD_TYPE] = {NULL};
@@ -71,6 +72,7 @@ void custom_task_info_init(void)
     s_my_task_info[MOD_CTRL] = s_my_ctrl_task_id;
     s_my_task_info[MOD_LTE] = s_my_lte_task_id;
     s_my_task_info[MOD_WIFI] = s_my_wifi_task_id;
+    s_my_task_info[MOD_GPRS] = s_my_gprs_task_id;
     s_my_task_info[MOD_GSENSOR] = s_my_gsensor_task_id;
 }
 
@@ -468,6 +470,12 @@ int main(void)
     if (err)
     {
         MY_LOG_ERR("Failed to initialize G-Sensor (err %d)", err);
+    }
+
+    err = my_gprs_init(&s_my_gprs_task_id);
+    if (err)
+    {
+        MY_LOG_ERR("Failed to initialize GPRS module (err %d)", err);
     }
 
     /* 初始化自定义任务信息 */

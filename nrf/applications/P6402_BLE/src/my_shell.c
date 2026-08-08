@@ -617,6 +617,28 @@ static int cmd_esp32cmd(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
+// app tcpcmd connect
+static int cmd_tcpcmd(const struct shell *shell, size_t argc, char **argv)
+{
+    shell_print(shell, "Recv %d bytes tcpcmd: %s", strlen(argv[1]), argv[1]);
+
+    if (CMD_EQUAL(argv[1], "connect"))
+    {
+        my_send_msg(MOD_MAIN, MOD_GPRS, MY_MSG_SOCKET_CONNECT);
+    }
+    else if (CMD_EQUAL(argv[1], "send"))
+    {
+        my_send_msg(MOD_MAIN, MOD_GPRS, MY_MSG_SOCKET_SEND);
+    }
+    else
+    {
+        shell_print(shell, "Unknown tcpcmd: %s", argv[1]);
+        my_send_msg(MOD_MAIN, MOD_GPRS, MY_MSG_WIFI_VERSION);
+    }
+
+    return 0;
+}
+
 /* 注册自定义命令到 Shell 子系统 */
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_app,
     SHELL_CMD(sysinfo, NULL, "Display system information", cmd_system_info),
@@ -631,6 +653,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_app,
     SHELL_CMD(hardware_test, NULL, "Run hardware test", cmd_hardware_test),
     SHELL_CMD(read_gsensor_data, NULL, "Read G-Sensor data", cmd_read_gsensor_data),
     SHELL_CMD(esp32cmd, NULL, "Send ESP32 command", cmd_esp32cmd),
+    SHELL_CMD(tcpcmd, NULL, "Send tcp command", cmd_tcpcmd),
     SHELL_SUBCMD_SET_END
 );
 /* Zephyr Shell 子系统提供的宏，随 nRF Connect SDK一起提供，用来在 Shell里注册一个“根命令”

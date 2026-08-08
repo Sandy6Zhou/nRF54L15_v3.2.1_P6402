@@ -12,7 +12,17 @@
 #ifndef _MY_VERSION_H_
 #define _MY_VERSION_H_
 
-#define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260803"
+#define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260806"
+/* 软件版本:        V1.0
+** 完成日期:        2026.08.06
+** 作    者:       唐超发 (tangchaofa@jimiiot.com)
+** 修改内容:        完善wifi模块功能，实现esp32 WiFi配网等功能
+**                 1.增加GPRS业务代码，域名解析等功能待完善。;
+**                 2.实现esp32 WiFi 连接，tcp连接、tcp发送、接收等接口;
+**                 3.增加tcp shell测试指令;
+***/
+
+// #define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260803"
 /* 软件版本:        V1.0
 ** 完成日期:        2026.08.03
 ** 作    者:       周森达 (zhousenda@jimiiot.com)

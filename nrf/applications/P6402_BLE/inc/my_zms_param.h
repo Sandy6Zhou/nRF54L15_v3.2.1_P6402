@@ -36,6 +36,7 @@ enum {
     BLE_LOG_MOD_ALGORITHM, /* 算法模块 */
     BLE_LOG_MOD_UART, /* 串口模块 */
     BLE_LOG_MOD_WIFI, /* WiFi模块 */
+    BLE_LOG_MOD_GPRS, /* GPRS模块 */
     BLE_LOG_MOD_OTHER, /* 其他模块 */
     BLE_LOG_MOD_MAX /* 最大模块数 */
 };

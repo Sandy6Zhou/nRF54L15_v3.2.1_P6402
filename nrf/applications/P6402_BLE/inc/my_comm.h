@@ -104,6 +104,7 @@ typedef enum
     MOD_CTRL,        // Control处理程序
     MOD_LTE,         // LTE处理程序
     MOD_WIFI,        // WIFI处理程序
+    MOD_GPRS,        // GPRS处理程序
     MOD_GSENSOR,     // G-Sensor处理程序
     MOD_FOTA,        // FOTA处理程序
     MAX_MY_MOD_TYPE, // 最大模块类型
@@ -208,6 +209,19 @@ typedef enum
     MY_MSG_UART_REV,
     MY_MSG_UART_IDLE,
 
+    MY_MSG_WIFI_PWR_ON,                 /* WIFI模块上电消息 */
+    MY_MSG_WIFI_PWR_OFF,                /* WIFI模块下电消息 */
+    MY_MSG_WIFI_INIT,                   /* WIFI模块初始化消息 */
+    MY_MSG_WIFI_VERSION,                /* WIFI模块版本查询消息 */
+    MY_MSG_WIFI_CONNECT,                /* WIFI连接消息 */
+    MY_MSG_WIFI_GET_IP,                 /* WIFI获取IP消息 */
+
+    MY_MSG_SOCKET_GET_HOSTNAME,         /* 获取主机名消息 */
+    MY_MSG_SOCKET_CONNECT,              /* socket连接消息 */
+    MY_MSG_SOCKET_CLOSE,                /* socket关闭消息 */
+    MY_MSG_SOCKET_SEND,                 /* socket发送数据消息 */
+    MY_MSG_SOCKET_REV,                  /* socket接收数据消息 */
+
     /* CTRL处理程序消息 */
     MY_MSG_CTRL_KEY_SHORT_PRESS,       /* 按键短按事件 */
     MY_MSG_CTRL_KEY_LONG_PRESS,        /* 按键长按事件（3秒） */
@@ -279,5 +293,6 @@ typedef enum
 #include "my_zms_param.h"
 #include "my_uart.h"
 #include "my_wifi.h"
+#include "my_gprs.h"
 
 #endif /* _MY_COMMON_H_ */
