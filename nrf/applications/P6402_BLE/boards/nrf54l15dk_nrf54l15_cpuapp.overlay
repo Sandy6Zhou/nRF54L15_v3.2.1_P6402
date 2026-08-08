@@ -38,7 +38,7 @@
 		gsensor-int = &gsen_int;
 		battery-gauge-int = &battery_gauge_int;
 		charge-detect = &charge_det;
-		magnetic-uart = &uart20;
+		wifi-uart = &uart20;
 		battery-led0 = &batt_led0;
 		battery-led1 = &batt_led1;
 		battery-led2 = &batt_led2;

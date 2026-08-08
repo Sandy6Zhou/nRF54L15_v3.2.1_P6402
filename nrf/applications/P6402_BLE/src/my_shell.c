@@ -608,6 +608,15 @@ void cmd_read_gsensor_data(const struct shell *sh, size_t argc, char **argv)
                 data.gyr_x_mdps, data.gyr_y_mdps, data.gyr_z_mdps);
 }
 
+// app esp32cmd AT+GMR
+static int cmd_esp32cmd(const struct shell *shell, size_t argc, char **argv)
+{
+    shell_print(shell, "Recv %d bytes esp32cmd: %s", strlen(argv[1]), argv[1]);
+
+    my_wifi_send_msg_data(argv[1]);
+    return 0;
+}
+
 /* 注册自定义命令到 Shell 子系统 */
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_app,
     SHELL_CMD(sysinfo, NULL, "Display system information", cmd_system_info),
@@ -621,6 +630,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_app,
     SHELL_CMD(retransmit_check_test, NULL, "Run retransmit_check_test test", cmd_retransmit_check_test),
     SHELL_CMD(hardware_test, NULL, "Run hardware test", cmd_hardware_test),
     SHELL_CMD(read_gsensor_data, NULL, "Read G-Sensor data", cmd_read_gsensor_data),
+    SHELL_CMD(esp32cmd, NULL, "Send ESP32 command", cmd_esp32cmd),
     SHELL_SUBCMD_SET_END
 );
 /* Zephyr Shell 子系统提供的宏，随 nRF Connect SDK一起提供，用来在 Shell里注册一个“根命令”

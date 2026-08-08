@@ -20,22 +20,25 @@
 #define MY_MAC_LENGTH                       6
 
 /* 蓝牙日志模块ID定义 */
-#define BLE_LOG_MOD_MAIN     0 /* main模块 */
-#define BLE_LOG_MOD_BLE      1 /* 蓝牙模块 */
-#define BLE_LOG_MOD_DFU      2 /* DFU模块 */
-#define BLE_LOG_MOD_SENSOR   3 /* 传感器模块 */
-#define BLE_LOG_MOD_LTE      4 /* LTE模块 */
-#define BLE_LOG_MOD_CTRL     5 /* 控制模块 */
-#define BLE_LOG_MOD_SHELL    6 /* Shell模块 */
-#define BLE_LOG_MOD_BATTERY  7 /* 电池模块 */
-#define BLE_LOG_MOD_CMD      8 /* 命令设置模块 */
-#define BLE_LOG_MOD_TOOL     9 /* 工具模块 */
-#define BLE_LOG_MOD_PARAM   10 /* 参数模块 */
-#define BLE_LOG_MOD_WDT     11 /* 看门狗模块 */
-#define BLE_LOG_MOD_ALGORITHM 12 /* 算法模块 */
-#define BLE_LOG_MOD_MAGNETIC_UART 13 /* 磁吸串口模块 */
-#define BLE_LOG_MOD_OTHER   14 /* 其他模块 */
-#define BLE_LOG_MOD_MAX     15 /* 最大模块数 */
+enum {
+    BLE_LOG_MOD_MAIN = 0, /* main模块 */
+    BLE_LOG_MOD_BLE, /* 蓝牙模块 */
+    BLE_LOG_MOD_DFU, /* DFU模块 */
+    BLE_LOG_MOD_SENSOR, /* 传感器模块 */
+    BLE_LOG_MOD_LTE, /* LTE模块 */
+    BLE_LOG_MOD_CTRL, /* 控制模块 */
+    BLE_LOG_MOD_SHELL, /* Shell模块 */
+    BLE_LOG_MOD_BATTERY, /* 电池模块 */
+    BLE_LOG_MOD_CMD, /* 命令设置模块 */
+    BLE_LOG_MOD_TOOL, /* 工具模块 */
+    BLE_LOG_MOD_PARAM, /* 参数模块 */
+    BLE_LOG_MOD_WDT, /* 看门狗模块 */
+    BLE_LOG_MOD_ALGORITHM, /* 算法模块 */
+    BLE_LOG_MOD_UART, /* 串口模块 */
+    BLE_LOG_MOD_WIFI, /* WiFi模块 */
+    BLE_LOG_MOD_OTHER, /* 其他模块 */
+    BLE_LOG_MOD_MAX /* 最大模块数 */
+};
 
 /* 获取指定模块在 mod_en bitmap 中的开关状态
  * 使用32位bitmap，mod_id 直接对应位位置 (0-31) */

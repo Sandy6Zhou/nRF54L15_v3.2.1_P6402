@@ -32,7 +32,8 @@ target_sources(app PRIVATE
   src/my_shell.c
   src/my_ble_core.c
   src/my_lte.c
-  src/my_magnetic_uart.c
+  src/my_uart.c
+  src/my_wifi.c
   src/my_gsensor.c
   src/my_ctrl.c
   src/my_battery.c

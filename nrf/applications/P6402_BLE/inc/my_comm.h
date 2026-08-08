@@ -103,7 +103,7 @@ typedef enum
     MOD_BLE,         // BLE处理程序
     MOD_CTRL,        // Control处理程序
     MOD_LTE,         // LTE处理程序
-    MOD_MAGNETIC_UART, // 磁吸串口处理程序
+    MOD_WIFI,        // WIFI处理程序
     MOD_GSENSOR,     // G-Sensor处理程序
     MOD_FOTA,        // FOTA处理程序
     MAX_MY_MOD_TYPE, // 最大模块类型
@@ -190,25 +190,23 @@ typedef enum
     MY_MSG_UPDATE_BATTERY, // 更新电池状态消息
 
     /* LTE处理程序消息 */
-    MY_MSG_LTE_UART_IDLE,
-    MY_MSG_LTE_TX_DONE,
-    MY_MSG_LTE_TX_ABORTED,
     MY_MSG_LTE_PWRON,
     MY_MSG_LTE_PWROFF,
-    MY_MSG_LTE_REV,
     MY_MSG_RETRANS_CHECK,
     MY_MSG_ADD_RETRANS_QUEUE,
     MY_MSG_LTE_PULSE_START,
     MY_MSG_LTE_PULSE_STOP,
-    MY_MSG_MAGNETIC_UART_REV,
-    MY_MSG_MAGNETIC_UART_IDLE,
-    MY_MSG_MAGNETIC_UART_TX_DONE,
-    MY_MSG_MAGNETIC_UART_TX_ABORTED,
-    MY_MSG_MAGNETIC_UART_SEND,
 
     /* G-Sensor处理程序消息 */
     MY_MSG_GSENSOR_INT,             /* G-Sensor INT1 中断消息 */
     MY_MSG_READ_GSENSOR_DATA,       /* 读取G-Sensor数据消息 */
+
+    /* UART消息 */
+    MY_MSG_UART_TX_DONE,
+    MY_MSG_UART_TX_ABORTED,
+    MY_MSG_UART_SEND,
+    MY_MSG_UART_REV,
+    MY_MSG_UART_IDLE,
 
     /* CTRL处理程序消息 */
     MY_MSG_CTRL_KEY_SHORT_PRESS,       /* 按键短按事件 */
@@ -264,7 +262,6 @@ typedef enum
 #include "my_ble_core.h"
 #include "my_shell.h"
 #include "my_lte.h"
-#include "my_magnetic_uart.h"
 #include "my_gsensor.h"
 #include "my_battery.h"
 #include "my_wdt.h"
@@ -280,5 +277,7 @@ typedef enum
 #include "my_flash_store.h"
 #include "my_ctrl.h"
 #include "my_zms_param.h"
+#include "my_uart.h"
+#include "my_wifi.h"
 
 #endif /* _MY_COMMON_H_ */

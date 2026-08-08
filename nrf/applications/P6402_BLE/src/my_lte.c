@@ -256,7 +256,7 @@ static void lte_uart_idle_timer_handler(struct k_timer *timer)
 {
     ARG_UNUSED(timer);
 
-    my_send_msg(MOD_LTE, MOD_LTE, MY_MSG_LTE_UART_IDLE);
+    my_send_msg(MOD_LTE, MOD_LTE, MY_MSG_UART_IDLE);
 }
 
 /********************************************************************
@@ -1239,7 +1239,7 @@ static void lte_uart_cb(const struct device *dev, struct uart_event *evt, void *
     {
         case UART_TX_DONE:
             // MY_LOG_INF("LTE UART TX Done");
-            my_send_msg(MOD_LTE, MOD_LTE, MY_MSG_LTE_TX_DONE);
+            my_send_msg(MOD_LTE, MOD_LTE, MY_MSG_UART_TX_DONE);
 
             // 传输完成，释放信号量
             k_sem_give(&s_TxDoneSem);
@@ -1254,7 +1254,7 @@ static void lte_uart_cb(const struct device *dev, struct uart_event *evt, void *
             // 将收到的数据写入循环缓冲区
             my_rb_write(&s_lte_rb, &evt->data.rx.buf[evt->data.rx.offset], evt->data.rx.len);
             // 通知LTE线程读取循环缓冲区数据
-            my_send_msg(MOD_MAIN, MOD_LTE, MY_MSG_LTE_REV);
+            my_send_msg(MOD_MAIN, MOD_LTE, MY_MSG_UART_REV);
 #endif
             break;
 
@@ -1280,7 +1280,7 @@ static void lte_uart_cb(const struct device *dev, struct uart_event *evt, void *
 
         case UART_TX_ABORTED:
             MY_LOG_WRN("LTE UART TX Aborted");
-            my_send_msg(MOD_LTE, MOD_LTE, MY_MSG_LTE_TX_ABORTED);
+            my_send_msg(MOD_LTE, MOD_LTE, MY_MSG_UART_TX_ABORTED);
             // 发送异常中止时也要释放等待信号量，避免发送线程永久阻塞
             k_sem_give(&s_TxDoneSem);
             break;
@@ -3042,13 +3042,13 @@ static void my_lte_task(void *p1, void *p2, void *p3)
         switch (msg.msgID)
         {
             /* TODO: 添加 LTE 相关的消息处理逻辑 */
-            case MY_MSG_LTE_TX_DONE:
-            case MY_MSG_LTE_TX_ABORTED:
+            case MY_MSG_UART_TX_DONE:
+            case MY_MSG_UART_TX_ABORTED:
                 // 发送完成后仅清发送忙状态，不额外延长3秒空闲挂起时间
                 s_lte_uart_ctx.tx_busy = false;
                 break;
 
-            case MY_MSG_LTE_UART_IDLE:
+            case MY_MSG_UART_IDLE:
                 if (s_lte_uart_ctx.active && lte_uart_can_suspend())
                 {
                     my_pm_device_suspend(MY_PM_DEV_LTE);
@@ -3067,7 +3067,7 @@ static void my_lte_task(void *p1, void *p2, void *p3)
                 break;
 
             // 收到4G发送的消息,例如返回UTC时间,在里面进行数据解析
-            case MY_MSG_LTE_REV:
+            case MY_MSG_UART_REV:
             {
                 static uint8_t read_buf[128];
                 int len = 0;
@@ -3162,13 +3162,7 @@ static void my_lte_task(void *p1, void *p2, void *p3)
 int my_lte_init(k_tid_t *tid)
 {
     int err;
-
-    /* 检查硬件设备是否就绪 */
-    if (!device_is_ready(lte_uart_dev))
-    {
-        MY_LOG_ERR("LTE UART device not ready");
-        return -ENODEV;
-    }
+    my_uart_config_t uart_cfg;
 
     if (!gpio_is_ready_dt(&lte_pwr_gpio))
     {
@@ -3213,17 +3207,19 @@ int my_lte_init(k_tid_t *tid)
         return err;
     }
 
-    // 初始化串口接收循环缓冲区
-    my_rb_init(&s_lte_rb, s_lte_rb_buf, LTE_UART_RB_SIZE);
+    /* 通过 UART 抽象层统一初始化 */
+    uart_cfg.dev = lte_uart_dev;
+    uart_cfg.cb = lte_uart_cb;
+    uart_cfg.cb_user_data = NULL;
+    uart_cfg.rb = &s_lte_rb;
+    uart_cfg.rb_buf = s_lte_rb_buf;
+    uart_cfg.rb_size = LTE_UART_RB_SIZE;
+    uart_cfg.tx_done_sem = &s_TxDoneSem;
 
-    // 初始值为1(表示UART空闲)
-    k_sem_init(&s_TxDoneSem, 1, 1);
-
-    /* 设置 UART 异步回调 */
-    err = uart_callback_set(lte_uart_dev, lte_uart_cb, NULL);
-    if (err)
+    err = my_uart_init(&uart_cfg);
+    if (err != 0)
     {
-        MY_LOG_ERR("Failed to set LTE UART callback (err %d)", err);
+        MY_LOG_ERR("LTE UART init failed: %d", err);
         return err;
     }
 
@@ -3259,7 +3255,7 @@ int my_lte_init(k_tid_t *tid)
     /* 设置线程名称 */
     k_thread_name_set(*tid, "MY_LTE");
 
-    MY_LOG_INF("LTE module initialized successfully (Loopback mode)");
+    LOG_INF("LTE module initialized successfully (Loopback mode)");
 
 #if RETRANSMIT_CHECK_ENABLED
     //初始化队列
