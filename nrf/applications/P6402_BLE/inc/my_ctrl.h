@@ -7,7 +7,7 @@
 **完成日期:        2026.01.15
 *********************************************************************
 ** 功能描述:        1. 整合 LED 指示灯控制
-**                 2. 整合蜂鸣器 PWM 驱动
+**                 2. 整合振动马达 GPIO 驱动
 **                 3. 实现 FUN_KEY (P1.09) 按键短按/长按检测
 **                 4. 实现光感、剪线检测中断接口
 **                 5. 提供独立线程处理控制任务
@@ -15,46 +15,6 @@
 
 #ifndef _MY_CTRL_H_
 #define _MY_CTRL_H_
-
-/* --- 蜂鸣器相关定义 --- */
-struct my_buzzer_note
-{
-    uint32_t freq_hz;     /* 频率 (Hz) */
-    uint32_t duration_ms; /* 持续时间 (ms) */
-};
-
-typedef enum
-{
-    /* 指令控制类型 (BUZZER 指令) */
-    BUZZER_STOP = 0,             // 0: 停止蜂鸣器
-    BUZZER_CONTINUOUS_ALARM,     // 1: 持续报警 (200ms ON, 500ms OFF, 不停止)
-    BUZZER_FAIL_TONE,            // 2: 失败提示音 (200ms ON, 200ms OFF, 响3声)
-    BUZZER_ERROR_TONE,           // 3: 异常提示音: 5次短鸣, 每次100ms, 间隔100ms
-    BUZZER_GENERAL_ALARM,        // 4: 一般报警音 (200ms ON, 300ms OFF, 持续30s)
-} my_buzzer_mode_t;
-
-typedef struct {
-    int tick;          // 当前计数（单位：100ms）
-    int on_time;       // 响多久（单位：tick）
-    int off_time;      // 停多久
-    int repeat;        // 剩余次数（0表示无限;>0指定次数）
-    uint8_t state;     // 0=关，1=开
-} buzzer_ctrl_t;
-
-typedef enum
-{
-    CLOSE_LED,   /* 关闭 LED */
-    OPEN_LED,    /* 打开 LED */
-    TOGGLE_LED,  /* 切换 LED 状态 */
-} my_led_ctrl_cmd_t;
-
-//定义了电池相关 LED ID，用于标识不同的 LED 指示灯
-typedef enum
-{
-    BATT_LED1,  /**< 电池 LED 1 */
-    BATT_LED2,  /**< 电池 LED 2 */
-    BATT_LED3,  /**< 电池 LED 3 */
-} my_led_id_t;
 
 /* --- 接口函数 --- */
 
@@ -71,51 +31,31 @@ typedef enum
 int my_ctrl_init(k_tid_t *tid);
 
 /********************************************************************
-**函数名称:  my_ctrl_buzzer_play_tone
-**入口参数:  freq_hz       ---   频率 (Hz)
-**           duration_ms   ---   持续时间 (ms)
+**函数名称:  my_ctrl_motor_on
+**入口参数:  on       ---        true 开启振动，false 关闭振动（输入）
 **出口参数:  无
-**函数功能:  播放一个指定频率和时长的单音
+**函数功能:  控制振动马达开关（P1.14，高电平振动）
 **返 回 值:  0 表示成功，负值表示失败
 *********************************************************************/
-int my_ctrl_buzzer_play_tone(uint32_t freq_hz, uint32_t duration_ms);
-
-/********************************************************************
-**函数名称:  my_ctrl_buzzer_play_sequence
-**入口参数:  notes         ---   音符数组指针
-**           num_notes     ---   音符数量
-**出口参数:  无
-**函数功能:  播放一组音符序列
-**返 回 值:  0 表示成功，负值表示失败
-*********************************************************************/
-int my_ctrl_buzzer_play_sequence(const struct my_buzzer_note *notes, uint32_t num_notes);
+int my_ctrl_motor_on(bool on);
 
 /********************************************************************
 **函数名称:  batt_led_set_level
 **入口参数:  level    ---   电量等级 (0~3)
 **出口参数:  无
-**函数功能:  设置电量指示灯等级
-**返 回 值:  0 表示成功，负值表示失败
-**功能描述:  根据 level 值点亮对应数量的电量 LED
-**           0 -> 全灭
-**           1 -> 只亮 batt_led0
-**           2 -> 亮 batt_led0, batt_led1
-**           3 -> 亮 batt_led0, batt_led1, batt_led2
+**函数功能:  设置电量指示灯等级（电量LED已删除，当前为空实现）
+**返 回 值:  0 表示成功
 *********************************************************************/
 int batt_led_set_level(uint8_t level);
 
-/**
-********************************************************************
-**函数名称：  my_set_buzzer_mode
-**入口参数：  buzzer_mode - 蜂鸣器模式枚举值 (my_buzzer_mode_t)
-**                        例如: BUZZER_STOP 等
-**出口参数：  无
-**函数功能：  设置蜂鸣器工作模式并触发控制任务处理
-**返 回 值：  无
-**功能描述：  向控制模块 (MOD_CTRL) 发送消息 (MY_MSG_CTRL_BUZZER_MODE)
-********************************************************************
-*/
-void my_set_buzzer_mode(my_buzzer_mode_t buzzer_mode);
+/********************************************************************
+**函数名称:  barometer_pwr_on
+**入口参数:  on       ---        true 开启，false 关闭（输入）
+**出口参数:  无
+**函数功能:  控制气压传感器供电（P2.09，高电平使能）
+**返回值:    0 表示成功，负值表示失败
+*********************************************************************/
+int barometer_pwr_on(bool on);
 
 /********************************************************************
 **函数名称:  send_alarm_message_to_lte

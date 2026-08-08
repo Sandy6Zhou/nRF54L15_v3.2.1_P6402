@@ -405,6 +405,14 @@ int main(void)
     log_custom_timestamp_set(custom_timestamp_formatter);
     print_reset_reason();
 
+    /* 提前初始化 LCD：上电后尽早清屏显示，避免等 BLE/LTE 等初始化完
+     * 才点亮屏幕造成的长时间白屏 */
+    err = my_lcd_init();
+    if (err)
+    {
+        MY_LOG_ERR("Failed to initialize LCD (err %d)", err);
+    }
+
     my_param_load_config();
 
     psa_crypto_init();  // PSA库初始化
@@ -418,7 +426,7 @@ int main(void)
     /* 初始化电源管理子系统（必须在其他模块之前） */
     my_pm_init();
 
-    /* 初始化系统控制模块 (LED, Buzzer, Key) */
+    /* 初始化系统控制模块 (LED, Motor, Key) */
     err = my_ctrl_init(&s_my_ctrl_task_id);
     if (err)
     {
@@ -526,6 +534,14 @@ int main(void)
                     go_to_shutdown();
                 }
                 MY_LOG_INF("KEY EVENT: Long press detected (3s)");
+                break;
+
+            case MY_MSG_CTRL_SOS_SHORT_PRESS:
+                MY_LOG_INF("SOS KEY EVENT: Short press detected");
+                break;
+
+            case MY_MSG_CTRL_SOS_LONG_PRESS:
+                MY_LOG_INF("SOS KEY EVENT: Long press detected (3s)");
                 break;
 
             case MY_MSG_CTRL_SHUTDOWN_REQUEST:

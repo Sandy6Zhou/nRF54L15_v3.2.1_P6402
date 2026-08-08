@@ -15,6 +15,18 @@
 #define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260806"
 /* 软件版本:        V1.0
 ** 完成日期:        2026.08.06
+** 作    者:       周森达 (zhousenda@jimiiot.com)
+** 修改内容:        新增ST7735P3 LCD显示模块，外设重构为马达/SOS键/充电使能方案，gsensor接入OM70201WV库仑计(同个线程共用I2C)
+**                 1.新增LCD模块(MIPI-DBI over SPI，96x160)：电源/背光/清屏/断电重初始化，开机提前点亮
+**                 2.新增SOS按键(P1.10)检测与振动马达(P1.14)驱动，删除蜂鸣器及电量LED相关代码
+**                 3.gsensor线程化，串行处理六轴与库仑计读取，中断仅投递消息
+**                 4.overlay重构：新增LCD/WIFI/充电/气压计电源引脚，SPIM00复用背光与显示
+**                 5.batt_enable更名为charge_enable，清理蜂鸣器命令/PM/Shell/ZMS残留
+***/
+
+// #define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260806"
+/* 软件版本:        V1.0
+** 完成日期:        2026.08.06
 ** 作    者:       唐超发 (tangchaofa@jimiiot.com)
 ** 修改内容:        完善wifi模块功能，实现esp32 WiFi配网等功能
 **                 1.增加GPRS业务代码，域名解析等功能待完善。;

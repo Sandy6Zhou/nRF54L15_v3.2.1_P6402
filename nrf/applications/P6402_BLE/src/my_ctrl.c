@@ -1,12 +1,12 @@
 /********************************************************************
 **版权所有         深圳市几米物联有限公司
 **文件名称:        my_ctrl.c
-**文件描述:        系统控制模块实现文件 (LED, Buzzer, Key)
+**文件描述:        系统控制模块实现文件 (LED, Motor, Key)
 **当前版本:        V1.0
 **作    者:        Harrison Wu (wuyujiao@jimiiot.com)
 **完成日期:        2026.01.15
 *********************************************************************
-** 功能描述:        1. 整合 LED 与蜂鸣器控制接口
+** 功能描述:        1. 整合 LED 与振动马达控制接口
 **                 2. 实现独立线程处理按键扫描与逻辑
 **                 3. 实现 FUN_KEY 按键短按/长按检测（下降沿中断+50ms轮询），实现按键事件发送到主任务
 **                 4. 实现光感(light sensor)检测中断处理,消抖处理，产生有光/无光事件并发送到主任务
@@ -27,21 +27,9 @@ LOG_MODULE_REGISTER(my_ctrl, LOG_LEVEL_INF);
 
 /* 硬件设备树定义 */
 static const struct gpio_dt_spec fun_key = GPIO_DT_SPEC_GET(DT_ALIAS(fun_key), gpios);
-static const struct pwm_dt_spec buzzer = PWM_DT_SPEC_GET(DT_ALIAS(buzzer_pwm));
-static const struct gpio_dt_spec batt_leds[] = {
-    GPIO_DT_SPEC_GET(DT_ALIAS(battery_led0), gpios),
-    GPIO_DT_SPEC_GET(DT_ALIAS(battery_led1), gpios),
-    GPIO_DT_SPEC_GET(DT_ALIAS(battery_led2), gpios),
-};
-
-static int ctrl_pwm_pm_init(void);
-// PWM 电源管理操作回调结构体
-static const pm_device_ops_t s_ctrl_pwm_pm_ops =
-{
-    .init = ctrl_pwm_pm_init,
-    .suspend = NULL,
-    .resume = NULL,
-};
+static const struct gpio_dt_spec sos_key = GPIO_DT_SPEC_GET(DT_ALIAS(sos_key), gpios);
+static const struct gpio_dt_spec motor = GPIO_DT_SPEC_GET(DT_ALIAS(motor_ctrl), gpios);
+static const struct gpio_dt_spec baro_pwr_en = GPIO_DT_SPEC_GET(DT_ALIAS(baro_pwr_ctrl), gpios);
 
 /* 按键控制结构 */
 static struct
@@ -51,7 +39,14 @@ static struct
     bool pressed;         /* 按键是否按下 */
 } key_ctrl_t;
 
-static buzzer_ctrl_t s_buzzer_ctrl = { 0 };
+/* SOS按键控制结构 */
+static struct
+{
+    struct k_timer timer; /* 50ms 轮询定时器 */
+    uint32_t press_count; /* 按下计数器 (50ms单位) */
+    bool pressed;         /* 按键是否按下 */
+} sos_key_ctrl_t;
+
 fs_barometer_record_t g_barometer_sample = { 0 };
 
 /* 定时器回调前向声明 */
@@ -65,9 +60,6 @@ K_MSGQ_DEFINE(my_ctrl_msgq, sizeof(msg_t), 10, 4);
 K_THREAD_STACK_DEFINE(my_ctrl_task_stack, MY_CTRL_TASK_STACK_SIZE);
 static struct k_thread s_my_ctrl_task_data;
 static struct gpio_callback s_misc_io_cb;
-
-/* 蜂鸣器100ms定时器 */
-static struct k_timer s_buzzer_timer;
 
 /********************************************************************
 **函数名称:  send_alarm_message_to_lte
@@ -382,6 +374,23 @@ static void device_status_read(void)
 }
 
 /********************************************************************
+**函数名称:  barometer_pwr_on
+**入口参数:  on       ---        true 开启，false 关闭（输入）
+**出口参数:  无
+**函数功能:  控制气压传感器供电（P2.09，高电平使能）
+**返回值:    0 表示成功，负值表示失败
+*********************************************************************/
+int barometer_pwr_on(bool on)
+{
+    if (!gpio_is_ready_dt(&baro_pwr_en))
+    {
+        return -ENODEV;
+    }
+
+    return gpio_pin_configure_dt(&baro_pwr_en, on ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE);
+}
+
+/********************************************************************
 **函数名称:  sensor_module_init
 **入口参数:  无
 **出口参数:  无
@@ -392,6 +401,12 @@ static void sensor_module_init(void)
 {
     struct barometer_config barometer_cfg;
     barometer_result_t barometer_ret;
+
+    /* 打开气压传感器电源（P2.09） */
+    if (barometer_pwr_on(true) != 0)
+    {
+        MY_LOG_ERR("barometer power on fail");
+    }
 
     memset(&barometer_cfg, 0, sizeof(barometer_cfg));
     // 初始化气压传感器采样参数
@@ -410,6 +425,42 @@ static void sensor_module_init(void)
     sensor_patm_timer_reload();
 }
 
+/********************************************************************
+**函数名称:  my_ctrl_motor_on
+**入口参数:  on       ---        true 开启振动，false 关闭振动（输入）
+**出口参数:  无
+**函数功能:  控制振动马达开关（P1.14，高电平振动）
+**返回值:    0 表示成功，负值表示失败
+*********************************************************************/
+int my_ctrl_motor_on(bool on)
+{
+    if (!gpio_is_ready_dt(&motor))
+    {
+        return -ENODEV;
+    }
+
+    gpio_pin_set_dt(&motor, on ? 1 : 0);
+    return 0;
+}
+
+/********************************************************************
+**函数名称:  motor_gpio_init
+**入口参数:  无
+**出口参数:  无
+**函数功能:  初始化振动马达 GPIO，配置为输出并默认关闭
+**返回值:    0 表示成功，负值表示失败
+*********************************************************************/
+static int motor_gpio_init(void)
+{
+    if (!gpio_is_ready_dt(&motor))
+    {
+        MY_LOG_ERR("Motor GPIO not ready");
+        return -ENODEV;
+    }
+
+    return gpio_pin_configure_dt(&motor, GPIO_OUTPUT_INACTIVE);
+}
+
 /* --- 休眠唤醒功能实现 --- */
 
 /********************************************************************
@@ -420,13 +471,13 @@ static void sensor_module_init(void)
 **返 回 值:  无
 **功能描述:  1. 关闭G-Sensor
 **           2. 启用充电使能(低电平为充电使能)
-**           3. 关闭电池 LED
+**           3. 关闭振动马达
 *********************************************************************/
 void peripheral_close()
 {
     my_gsensor_pwr_on(false);
-    batt_enable(true);
-    batt_led_set_level(0);
+    charge_enable(true);
+    my_ctrl_motor_on(false);
 }
 
 /********************************************************************
@@ -570,6 +621,56 @@ static void key_timer_handler(struct k_timer *timer)
 }
 
 /********************************************************************
+**函数名称:  sos_key_timer_handler
+**入口参数:  timer    ---   定时器指针
+**出口参数:  无
+**函数功能:  50ms轮询定时器回调，检测SOS按键状态
+**返 回 值:  无
+**功能描述:  1. 每50ms读取SOS按键电平
+**           2. 按键按下时计数器累加，达到60次(3s)触发长按事件
+**           3. 按键释放时停止定时器，根据计数判断短按并发送事件到主任务
+*********************************************************************/
+static void sos_key_timer_handler(struct k_timer *timer)
+{
+    ARG_UNUSED(timer);
+
+    int level = gpio_pin_get(sos_key.port, sos_key.pin);
+
+    if (level == 1)
+    {
+        /* 按键持续按下 */
+        if (!sos_key_ctrl_t.pressed)
+        {
+            sos_key_ctrl_t.pressed = true;
+            sos_key_ctrl_t.press_count = 0;
+        }
+
+        /* 计数器增加 */
+        sos_key_ctrl_t.press_count++;
+    }
+    else
+    {
+        /* 按键已释放 */
+        if (sos_key_ctrl_t.pressed)
+        {
+            sos_key_ctrl_t.pressed = false;
+            k_timer_stop(&sos_key_ctrl_t.timer);
+
+            /* 短按判断：大于等于100ms且小于3s */
+            if (sos_key_ctrl_t.press_count < KEY_LONG_PRESS_COUNT && sos_key_ctrl_t.press_count >= 2)
+            {
+                send_key_event(MY_MSG_CTRL_SOS_SHORT_PRESS);
+            }
+            else if (sos_key_ctrl_t.press_count >= KEY_LONG_PRESS_COUNT)
+            {
+                send_key_event(MY_MSG_CTRL_SOS_LONG_PRESS);
+            }
+            sos_key_ctrl_t.press_count = 0;
+        }
+    }
+}
+
+/********************************************************************
 **函数名称:  misc_io_isr
 **入口参数:  dev      ---   GPIO 设备指针
 **           cb       ---   回调结构体指针
@@ -591,6 +692,15 @@ static void misc_io_isr(const struct device *dev,
         {
             //定时器不在运行就启动定时器
             k_timer_start(&key_ctrl_t.timer, K_MSEC(KEY_POLL_PERIOD_MS), K_MSEC(KEY_POLL_PERIOD_MS));
+        }
+    }
+
+    if (pins & BIT(sos_key.pin))
+    {
+        if (!k_timer_remaining_get(&sos_key_ctrl_t.timer))
+        {
+            //定时器不在运行就启动定时器
+            k_timer_start(&sos_key_ctrl_t.timer, K_MSEC(KEY_POLL_PERIOD_MS), K_MSEC(KEY_POLL_PERIOD_MS));
         }
     }
 }
@@ -649,392 +759,44 @@ static int misc_io_init(void)
     /* 初始化按键定时器 */
     key_timer_init();
 
-    /* 注册按键中断回调 */
-    gpio_init_callback(&s_misc_io_cb, misc_io_isr, BIT(fun_key.pin));
+    /* 配置SOS按键为输入（P1.10 内部下拉） */
+    if (!device_is_ready(sos_key.port))
+    {
+        return -ENODEV;
+    }
+
+    ret = gpio_pin_configure(sos_key.port, sos_key.pin, GPIO_INPUT | GPIO_PULL_DOWN);
+    if (ret)
+    {
+        MY_LOG_ERR("Failed to configure sos_key: %d", ret);
+        return ret;
+    }
+
+    /* 配置SOS按键中断：上升沿触发 */
+    ret = gpio_pin_interrupt_configure_dt(&sos_key, GPIO_INT_EDGE_RISING);
+    if (ret)
+    {
+        MY_LOG_ERR("Failed to configure sos_key interrupt: %d", ret);
+        return ret;
+    }
+
+    /* 初始化SOS按键定时器 */
+    k_timer_init(&sos_key_ctrl_t.timer, sos_key_timer_handler, NULL);
+
+    /* 注册按键中断回调（fun_key 与 sos_key 共用同一 GPIO 端口 gpio1） */
+    gpio_init_callback(&s_misc_io_cb, misc_io_isr, BIT(fun_key.pin) | BIT(sos_key.pin));
     gpio_add_callback(fun_key.port, &s_misc_io_cb);
 
     return 0;
 }
 
-/********************************************************************
-**函数名称:  ctrl_pwm_pm_init
-**入口参数:  无
-**出口参数:  无
-**函数功能:  PWM 电源管理初始化
-**返 回 值:  0 表示成功
-*********************************************************************/
-static int ctrl_pwm_pm_init(void)
-{
-    // 初始化蜂鸣器 PWM
-    if (!pwm_is_ready_dt(&buzzer))
-    {
-        MY_LOG_ERR("Buzzer PWM not ready");
-        return -ENODEV;
-    }
-    return 0;
-}
-
-/********************************************************************
-**函数名称:  my_ctrl_pwm_pm_register
-**入口参数:  无
-**出口参数:  无
-**函数功能:  将 PWM 模块注册到统一 PM 框架
-**返 回 值:  0 表示成功，负值表示失败
-*********************************************************************/
-int my_ctrl_pwm_pm_register(void)
-{
-    return my_pm_device_register(MY_PM_DEV_PWM, &s_ctrl_pwm_pm_ops);
-}
-
-/********************************************************************
-**函数名称:  my_ctrl_stop_buzzer
-**入口参数:  无
-**出口参数:  无
-**函数功能:  停止蜂鸣器发声
-**返 回 值:  无
-**功能描述:  将 PWM 占空比设为 0，关闭蜂鸣器
-*********************************************************************/
-void my_ctrl_stop_buzzer(void)
-{
-    pwm_set_pulse_dt(&buzzer, 0);
-}
-
-/********************************************************************
-**函数名称:  my_ctrl_start_buzzer
-**入口参数:  无
-**出口参数:  无
-**函数功能:  开启蜂鸣器发声
-**返 回 值:  无
-**功能描述:  将 PWM 占空比设为 50，开启蜂鸣器(当前脉宽暂时设置250000,由于开机响的时候设置了周期，此值为周期一半)
-*********************************************************************/
-void my_ctrl_start_buzzer(void)
-{
-    pwm_set_pulse_dt(&buzzer, 250000);
-}
-
-/********************************************************************
-**函数名称:  my_ctrl_buzzer_play_tone
-**入口参数:  freq_hz       ---   频率(Hz)，0 表示停止
-**           duration_ms   ---   持续时间(ms)，0 表示持续发声
-**出口参数:  无
-**函数功能:  播放指定频率的声音
-**返 回 值:  0 表示成功，负值表示失败
-**功能描述:  1. 根据频率计算 PWM 周期和占空比
-**           2. 设置 PWM 输出
-**           3. 若指定持续时间，则延时后自动停止
-*********************************************************************/
-int my_ctrl_buzzer_play_tone(uint32_t freq_hz, uint32_t duration_ms)
-{
-    if (freq_hz == 0)
-    {
-        my_ctrl_stop_buzzer();
-    }
-    else
-    {
-        uint32_t period = (uint32_t)(1000000000ULL / freq_hz);
-        uint32_t pulse = period / 2;
-
-        int err = pwm_set_dt(&buzzer, period, pulse);
-        if (err)
-        {
-            MY_LOG_ERR("Failed to set PWM (err %d)", err);
-            return err;
-        }
-    }
-
-    if (duration_ms > 0)
-    {
-        k_msleep(duration_ms);
-        my_ctrl_stop_buzzer();
-    }
-
-    return 0;
-}
-
-/********************************************************************
-**函数名称:  my_ctrl_buzzer_play_sequence
-**入口参数:  notes      ---   音符数组指针
-**           num_notes  ---   音符数量
-**出口参数:  无
-**函数功能:  播放音符序列
-**返 回 值:  0 表示成功，负值表示失败
-**功能描述:  依次播放音符数组中的每个音符，间隔 10ms
-*********************************************************************/
-int my_ctrl_buzzer_play_sequence(const struct my_buzzer_note *notes, uint32_t num_notes)
-{
-    if (notes == NULL || num_notes == 0)
-        return -EINVAL;
-
-    for (uint32_t i = 0; i < num_notes; i++)
-    {
-        my_ctrl_buzzer_play_tone(notes[i].freq_hz, notes[i].duration_ms);
-        k_msleep(10);
-    }
-    return 0;
-}
-
-/* --- LED 功能实现 --- */
-
-/********************************************************************
-**函数名称:  leds_init
-**入口参数:  无
-**出口参数:  无
-**函数功能:  初始化 LED GPIO
-**返 回 值:  0 表示成功，负值表示失败
-**功能描述:  1. 检查 GPIO 设备就绪状态
-**           2. 配置电量指示灯为输出，默认灭
-*********************************************************************/
-static int leds_init(void)
-{
-    int ret;
-
-    /* 所有电量 LED 共用同一个 port（gpio2），检查第一个即可 */
-    if (!device_is_ready(batt_leds[0].port))
-    {
-        return -ENODEV;
-    }
-
-    /* 配置电量指示灯为输出，默认灭 */
-    for (size_t i = 0; i < ARRAY_SIZE(batt_leds); i++)
-    {
-        ret = gpio_pin_configure_dt(&batt_leds[i], GPIO_OUTPUT_INACTIVE);
-        if (ret)
-        {
-            return ret;
-        }
-    }
-
-    return 0;
-}
-
-/********************************************************************
-**函数名称:  my_led_process
-**入口参数:  led_id       --  LED ID，BATT_LED0~BATT_LED3
-**           led_cmd      --  LED 操作命令，OPEN_LED、CLOSE_LED、TOGGLE_LED、FICKER_LED
-**出口参数:  无
-**函数功能:  根据指定的操作命令执行相应的 LED 控制操作
-**返 回 值:  无
-*********************************************************************/
-void my_ctrl_led_process(my_led_id_t led_id, my_led_ctrl_cmd_t led_cmd)
-{
-    // MY_LOG_INF("my_led:%d cmd:%d", led_id, led_cmd);
-    // 根据 LED 操作命令执行不同的操作
-    switch (led_cmd)
-    {
-        case OPEN_LED:
-            gpio_pin_set_dt(&batt_leds[led_id], 1);
-            break;
-
-        case CLOSE_LED:
-            gpio_pin_set_dt(&batt_leds[led_id], 0);
-            break;
-
-         case TOGGLE_LED:
-            gpio_pin_toggle_dt(&batt_leds[led_id]);
-            break;
-
-        default:
-            /* 忽略未知操作 */
-            break;
-    }
-}
-
-/********************************************************************
-**函数名称:  batt_led_set_level
-**入口参数:  level    ---   电量等级 (0~3)
-**出口参数:  无
-**函数功能:  设置电量指示灯等级
-**返 回 值:  0 表示成功，负值表示失败
-**功能描述:  根据 level 值点亮对应数量的电量 LED
-**           0 -> 全灭
-**           1 -> 只亮 batt_led0
-**           2 -> 亮 batt_led0, batt_led1
-**           3 -> 亮 batt_led0, batt_led1, batt_led2
-*********************************************************************/
+/* 电量LED功能已删除：P2.07/P2.08/P2.09 改作充电使能/WIFI电源/气压计电源 */
 int batt_led_set_level(uint8_t level)
 {
-    int ret;
-    int on;
+    ARG_UNUSED(level);
 
-    if (level > 3)
-    {
-        level = 3;
-    }
-
-    for (size_t i = 0; i < ARRAY_SIZE(batt_leds); i++)
-    {
-        on = (i < level) ? 1 : 0;
-#if 0
-        ret = gpio_pin_set_dt(&batt_leds[i], on);
-        if (ret < 0)
-        {
-            return ret;
-        }
-#endif
-        my_ctrl_led_process(i, on);
-    }
-
+    /* 电量LED硬件已删除，保留空实现以兼容旧调用 */
     return 0;
-}
-
-/**
-********************************************************************
-**函数名称：  my_set_buzzer_mode
-**入口参数：  buzzer_mode - 蜂鸣器模式枚举值 (MY_BUZZER_MODE)
-**                        例如: BUZZER_STOP 等
-**出口参数：  无
-**函数功能：  设置蜂鸣器工作模式并触发控制任务处理
-**返 回 值：  无
-**功能描述：  向控制模块 (MOD_CTRL) 发送消息 (MY_MSG_CTRL_BUZZER_MODE)
-********************************************************************
-*/
-void my_set_buzzer_mode(my_buzzer_mode_t buzzer_mode)
-{
-    msg_t msg;
-    my_buzzer_mode_t *buzzer_mode_loc;
-
-    MY_MALLOC_BUFFER(buzzer_mode_loc, sizeof(my_buzzer_mode_t));
-    if(buzzer_mode_loc == NULL)
-    {
-        MY_LOG_ERR("buzzer_mode_loc malloc failed");
-        return;
-    }
-    *buzzer_mode_loc = buzzer_mode;
-
-    // 构建消息结构体并发送给MAIN模块
-    msg.msgID = MY_MSG_CTRL_BUZZER_MODE;
-    msg.pData = buzzer_mode_loc;
-
-    my_send_msg_data(MOD_CTRL, MOD_CTRL, &msg);
-}
-
-/**
-********************************************************************
-**函数名称：  g_buzzer_ctrl_config
-**入口参数：  on_time   - 蜂鸣器单次“响”的持续时间 (单位: 100ms tick数)
-**           off_time  - 蜂鸣器单次“停”的持续时间 (单位: 100ms tick数)
-**           repeat    - 重复次数 (0: 无限循环; >0: 指定次数)
-**出口参数:  无
-**函数功能:  配置蜂鸣器控制结构体的基本参数
-**返 回 值:  无
-**功能描述:  将传入的时间参数和重复次数保存到全局控制结构体,repeat是重复次数，如果
-            持续X秒，计算方式repeat = X*10/(on_time+off_time)
-********************************************************************
-*/
-void g_buzzer_ctrl_config(int on_time, int off_time, int repeat)
-{
-    s_buzzer_ctrl.on_time = on_time;
-    s_buzzer_ctrl.off_time = off_time;
-    s_buzzer_ctrl.repeat = repeat;
-    //启动蜂鸣器，状态为1
-    s_buzzer_ctrl.state = 1;
-    s_buzzer_ctrl.tick = 0;
-}
-
-/**
-********************************************************************
-**函数名称:  my_buzzer_play
-**入口参数:  buzzer_mode - 蜂鸣器音效类型枚举值 (MY_BUZZER_MODE)
-**出口参数:  无
-**函数功能:  根据传入的类型选择对应的蜂鸣器音效模式并启动
-**返 回 值:  无
-**功能描述:  1. 解析 buzzer_type，调用 config 函数设置对应的响/停时间及重复次数。
-**           2. 发送开启蜂鸣器消息 (MY_MSG_CTRL_BUZZER_ON)。
-**           3. 重置内部状态机 (state=1, tick=0)。
-**           4. 重启定时器 buzzer_timer，设置为每 100ms 触发一次中断。
-**注意事项:  时间单位统一为 100ms。定时器周期固定为 100ms。
-********************************************************************
-*/
-void my_buzzer_play(my_buzzer_mode_t buzzer_mode)
-{
-    MY_LOG_INF("buzzer_mode = %d", buzzer_mode);
-    switch(buzzer_mode)
-    {
-        case BUZZER_STOP:
-            k_timer_stop(&s_buzzer_timer);
-            my_send_msg(MOD_CTRL, MOD_CTRL, MY_MSG_CTRL_BUZZER_OFF);
-            return;
-
-        case BUZZER_CONTINUOUS_ALARM:
-            //持续报警：响200ms, 停500ms
-            g_buzzer_ctrl_config(2, 5, 0);
-            break;
-
-        case BUZZER_FAIL_TONE:
-            //失败提示：响200ms, 停200ms, 重复3次
-            g_buzzer_ctrl_config(2, 2, 3);
-            break;
-
-        case BUZZER_ERROR_TONE:
-            //异常提示：响100ms, 停100ms, 重复5次
-            g_buzzer_ctrl_config(1, 1, 5);
-            break;
-
-        case BUZZER_GENERAL_ALARM:
-            //一般报警：响200ms, 停300ms, 重复60次 (30秒)
-            g_buzzer_ctrl_config(2, 3, 60);
-            break;
-
-    }
-
-    my_send_msg(MOD_CTRL, MOD_CTRL, MY_MSG_CTRL_BUZZER_ON);
-
-    k_timer_stop(&s_buzzer_timer);
-    //初始化计数器
-    k_timer_start(&s_buzzer_timer, K_MSEC(100), K_MSEC(100));
-}
-
-/**
-********************************************************************
-**函数名称:  buzzer_timer_handler
-**入口参数:  timer - 定时器对象指针 (未使用)
-**出口参数:  无
-**函数功能:  蜂鸣器时序控制中断回调函数 (每100ms触发一次)
-**返 回 值:  无
-**功能描述:  实现蜂鸣器的“响-停-响”节奏控制状态机。
-**           1. 累加 tick 计数 (每个tick代表100ms)。
-**           2. 根据当前 state (1:响, 0:停) 判断是否达到设定时间。
-**           3. 状态切换时发送开/关消息，并重置 tick。
-**           4. 在“响”转“停”时递减 repeat 计数，若为0则停止定时器。
-**注意事项:  此函数运行在中断上下文或高优先级线程中，应避免耗时操作。
-********************************************************************
-*/
-static void buzzer_timer_handler(struct k_timer *timer)
-{
-    ARG_UNUSED(timer);
-
-    s_buzzer_ctrl.tick++;
-
-    if (s_buzzer_ctrl.state)
-    {
-        // 当前是“响”（判断是否等于响多久的时间）
-        if (s_buzzer_ctrl.tick >= s_buzzer_ctrl.on_time)
-        {
-            //达到响多久即可关闭蜂鸣器
-            my_send_msg(MOD_CTRL, MOD_CTRL, MY_MSG_CTRL_BUZZER_OFF);
-            s_buzzer_ctrl.state = 0;
-            s_buzzer_ctrl.tick = 0;
-
-            //重复次数--，为0即可关闭定时器
-            if (s_buzzer_ctrl.repeat > 0)
-            {
-                s_buzzer_ctrl.repeat--;
-                if (s_buzzer_ctrl.repeat == 0)
-                    k_timer_stop(&s_buzzer_timer);
-            }
-        }
-    }
-    else
-    {
-        // 当前是“关”
-        if (s_buzzer_ctrl.tick >= s_buzzer_ctrl.off_time)
-        {
-            my_send_msg(MOD_CTRL, MOD_CTRL, MY_MSG_CTRL_BUZZER_ON);
-            s_buzzer_ctrl.state = 1;
-            s_buzzer_ctrl.tick = 0;
-        }
-    }
-
 }
 
 /********************************************************************
@@ -1054,7 +816,6 @@ static void my_ctrl_task(void *p1, void *p2, void *p3)
     ARG_UNUSED(p3);
 
     msg_t msg;
-    int ret;
 
     if (gConfigParam.led_config.led_display == 2)
     {
@@ -1083,37 +844,6 @@ static void my_ctrl_task(void *p1, void *p2, void *p3)
                 my_battery_update_state();//更新电池状态
                 break;
 
-            case MY_MSG_CTRL_BUZZER_MODE:
-                if (msg.pData)
-                {
-                    my_buzzer_play(*(my_buzzer_mode_t *)msg.pData);
-                    //释放内存
-                    MY_FREE_BUFFER(msg.pData);
-                    msg.pData = NULL;
-                }
-
-               break;
-
-            case MY_MSG_CTRL_BUZZER_ON:
-                ret = my_pm_device_resume(MY_PM_DEV_PWM);
-                if (ret < 0)
-                {
-                    MY_LOG_ERR("Beep PM resume failed: %d", ret);
-                    break;
-                }
-                my_ctrl_start_buzzer();
-                break;
-
-            case MY_MSG_CTRL_BUZZER_OFF:
-                my_ctrl_stop_buzzer();
-                ret = my_pm_device_suspend(MY_PM_DEV_PWM);
-                if (ret < 0)
-                {
-                    MY_LOG_ERR("Beep PM suspend failed: %d", ret);
-                    break;
-                }
-                break;
-
             case MY_MSG_CTRL_PATM_TIMER:
                 sensor_collect_barometer();
                 break;
@@ -1140,14 +870,12 @@ static void my_ctrl_task(void *p1, void *p2, void *p3)
                     my_stop_timer(MY_TIMER_LED_ENABLE);
                 }
                 led_enable(true);
-                batt_led_set_level(0);
                 my_send_msg(MOD_CTRL, MOD_CTRL, MY_MSG_LED_CTRL_MODE);
                 break;
 
             case MY_MSG_LED_DISABLE:
                 my_stop_timer(MY_TIMER_LED_BLINK);
                 led_enable(false);
-                batt_led_set_level(0);
                 break;
 
             default:
@@ -1165,7 +893,7 @@ static void my_ctrl_task(void *p1, void *p2, void *p3)
 **功能描述:  1. 初始化按键、光感 IO 中断
 **           2. 初始化 LED GPIO
 **           3. 初始化电池 ADC GPIO
-**           4. 检查蜂鸣器 PWM 就绪状态
+**           4. 初始化振动马达 GPIO
 **           5. 初始化消息队列处理
 **           6. 启动控制线程并设置名称
 **           7. 播放启动提示音
@@ -1177,12 +905,14 @@ int my_ctrl_init(k_tid_t *tid)
     // 初始化消息队列
     my_init_msg_handler(MOD_CTRL, &my_ctrl_msgq);
 
-    //  初始化按键、光感、LED GPIO、batt
+    //  初始化按键、电池 GPIO
     batt_gpio_init();
     misc_io_init();
-    leds_init();
     // 注：初始化中会立即开启定时器触发batt_update_timer_handler回调，会向ctrl发送消息（由于未初始化会丢消息），需放在ctrl初始化之后
     batt_adc_init();
+
+    // 初始化振动马达 GPIO（P1.14，默认关闭）
+    motor_gpio_init();
 
     ret = my_battery_pm_register();
     if (ret < 0)
@@ -1191,19 +921,7 @@ int my_ctrl_init(k_tid_t *tid)
         return ret;
     }
 
-    ret = my_ctrl_pwm_pm_register();
-    if (ret < 0)
-    {
-        MY_LOG_ERR("PWM PM registration failed: %d", ret);
-        return ret;
-    }
-
     sensor_module_init();
-
-    /* 启动时响一声提示音 */
-    my_ctrl_buzzer_play_tone(2000, 100);
-
-    k_timer_init(&s_buzzer_timer, buzzer_timer_handler, NULL);
 
     // 启动控制线程
     *tid = k_thread_create(&s_my_ctrl_task_data, my_ctrl_task_stack,

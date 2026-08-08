@@ -7,9 +7,12 @@
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/i2c/i2c.h>
 #include <zephyr/dt-bindings/pinctrl/nrf-pinctrl.h>
+#include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
 
 / {
 	chosen {
+		/* LCD 显示屏（ST7735r驱动兼容ST7735P3,目前硬件使用ST7735P3） */
+		zephyr,display = &lcd_st7735r;
 	};
 
 	/* 定义别名，方便代码调用 */
@@ -32,19 +35,20 @@
 		gsensor-i2c = &i2c21;
 		battery-gauge-i2c = &i2c21;
 		gsensor-pwr-ctrl = &gsensor_pwr_en;
-		buzzer-pwm = &buzzer_pwm_0;
+		motor-ctrl = &motor_gpio;
 		fun-key = &fun_key_pin;
-		batt-pwr-ctrl = &batt_pwr_en;
+		charge-pwr-ctrl = &charge_pwr_en;
 		gsensor-int = &gsen_int;
 		battery-gauge-int = &battery_gauge_int;
 		charge-detect = &charge_det;
 		wifi-uart = &uart20;
-		battery-led0 = &batt_led0;
-		battery-led1 = &batt_led1;
-		battery-led2 = &batt_led2;
-		temp-humi-i2c = &i2c22;
-		env-sensor-pwr-ctrl = &env_sensor_pwr_en;
+		wifi-pwr-ctrl = &wifi_pwr_en;
+		wifi-wake-ctrl = &wifi_wake_pin;
+		sos-key = &sos_key_pin;
+		baro-pwr-ctrl = &baro_pwr_en;
 		baro-i2c = &i2c22;
+		lcd-backlight = &lcd_bl_0;
+		lcd-pwr-ctrl = &lcd_pwr_en;
 	};
 	/* 删除板级节点 */
 	/delete-node/ leds;
@@ -60,26 +64,40 @@
 		};
 	};
 
-	/* 定义蜂鸣器 PWM 节点 */
-	buzzer_node {
-		compatible = "pwm-leds";
-		buzzer_pwm_0: buzzer_pwm_0 {
-			/* 蜂鸣器设置2.7KHz */
-			pwms = <&pwm20 0 PWM_HZ(2700) PWM_POLARITY_NORMAL>;
+	/* SOS 按键：P1.10，下拉输入，高电平有效 */
+	button_sos: button_sos {
+		compatible = "gpio-keys";
+		sos_key_pin: sos_key_pin {
+			gpios = <&gpio1 10 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
+			label = "SOS KEY";
 		};
 	};
 
-	/* G-Sensor 电源控制引脚配置,低电平有效,适配硬件设计 */
-	gsensor_pwr_en: gsensor-pwr-en {
+	/* 振动马达控制引脚：P1.14，高电平振动 */
+	motor_gpio: motor-gpio {
 		compatible = "nordic,gpio-pins";
-		gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
+		gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
 
-	/* LTE 电源控制引脚配置 */
+	/* 六轴传感器电源控制引脚配置：P2.10，低电平有效 */
+	gsensor_pwr_en: gsensor-pwr-en {
+		compatible = "nordic,gpio-pins";
+		gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+
+	/* 4G 电源控制引脚配置：P2.06，高电平有效 */
 	lte_pwr_en: lte-pwr-en {
 		compatible = "nordic,gpio-pins";
-		gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
+		gpios = <&gpio2 6 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+
+	/* WIFI 电源控制引脚配置：P2.08，高电平有效 */
+	wifi_pwr_en: wifi-pwr-en {
+		compatible = "nordic,gpio-pins";
+		gpios = <&gpio2 8 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
 
@@ -90,10 +108,17 @@
 		status = "okay";
 	};
 
-	/* P2.3: 电池使能，低电平使能 */
-	batt_pwr_en: batt-pwr-en {
+	/* WIFI 唤醒引脚配置：P0.02，外部上拉，WIFI拉低唤醒Nordic */
+	wifi_wake_pin: wifi-wake-pin {
 		compatible = "nordic,gpio-pins";
-		gpios = <&gpio2 3 GPIO_ACTIVE_LOW>;
+		gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+
+	/* P2.7: 充电使能，低电平使能 */
+	charge_pwr_en: charge-pwr-en {
+		compatible = "nordic,gpio-pins";
+		gpios = <&gpio2 7 GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};
 
@@ -104,10 +129,10 @@
 		status = "okay";
 	};
 
-	/* OM70201WV INTN：P0.02，默认上拉输入，低电平有效 */
+	/* OM70201WV INTN：P1.11，默认上拉输入，低电平有效 */
 	battery_gauge_int: battery-gauge-int {
 		compatible = "nordic,gpio-pins";
-		gpios = <&gpio0 2 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+		gpios = <&gpio1 11 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
 		status = "okay";
 	};
 
@@ -124,31 +149,66 @@
 		io-channels = <&adc 0>;
 	};
 
-	/* 电量指示灯组：P2.7 / P2.8 / P2.9 */
-	batt_leds: batt-leds {
-		compatible = "gpio-leds";
+	/* 气压计电源控制引脚：P2.09，高电平使能 */
+	baro_pwr_en: baro-pwr-en {
+		compatible = "nordic,gpio-pins";
+		gpios = <&gpio2 9 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
 
-		batt_led0: batt_led_0 {
-			gpios = <&gpio2 7 GPIO_ACTIVE_HIGH>;
-			label = "Battery LED 0";  /* 最低电量格 */
-		};
+	/* LCD 电源使能引脚：P2.00，高电平使能 */
+	lcd_pwr_en: lcd-pwr-en {
+		compatible = "nordic,gpio-pins";
+		gpios = <&gpio2 0 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
 
-		batt_led1: batt_led_1 {
-			gpios = <&gpio2 8 GPIO_ACTIVE_HIGH>;
-			label = "Battery LED 1";
-		};
-
-		batt_led2: batt_led_2 {
-			gpios = <&gpio2 9 GPIO_ACTIVE_HIGH>;
-			label = "Battery LED 2";  /* 最高电量格 */
+	/* LCD 背光 PWM 节点：pwm20 通道0，P1.12 */
+	lcd_bl_pwm: lcd-bl-pwm {
+		compatible = "pwm-leds";
+		lcd_bl_0: lcd_bl_0 {
+			/* 背光频率1kHz，可调占空比控制亮度 */
+			pwms = <&pwm20 0 PWM_HZ(1000) PWM_POLARITY_NORMAL>;
 		};
 	};
 
-	/* 温湿度、气压传感器电源控制引脚：P2.05，高电平使能 */
-	env_sensor_pwr_en: env-sensor-pwr-en {
-		compatible = "nordic,gpio-pins";
-		gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>;
-		status = "okay";
+	/* LCD 显示屏（ST7735）MIPI-DBI 节点 */
+	lcd_mipi_dbi {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi00>;
+		dc-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;    /* P2.03 RS */
+		reset-gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;  /* P2.04 RESET */
+		write-only;                                /* 无 MISO，禁止读操作 */
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		lcd_st7735r: st7735r@0 {
+			compatible = "sitronix,st7735r";
+			/* SPI 频率需能被 nRF54L15 SPIM 基频整除且分频为偶数，8MHz 为安全值 */
+			mipi-max-frequency = <8000000>;
+			mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+			reg = <0>;
+			width = <96>;
+			height = <160>;
+			x-offset = <18>;      /* GRM X 起始 0x12 */
+			y-offset = <1>;       /* GRM Y 起始 0x01 */
+			madctl = <0xC8>;      /* MY=1 MX=1 RGB=1(BGR) */
+			colmod = <0x05>;      /* 16bit RGB565 */
+			caset = [00 12 00 71];   /* 列 0x12~0x71 (96列) */
+			raset = [00 01 00 a0];   /* 行 0x01~0xA0 (160行) */
+			vmctr1 = <0x05>;      /* VCOM */
+			pwctr1 = [88 08 84];  /* 电源控制1 */
+			pwctr2 = [c4];        /* 电源控制2 */
+			pwctr3 = [0d 00];     /* 电源控制3 */
+			pwctr4 = [8d 2a];     /* 电源控制4 */
+			pwctr5 = [8d ee];     /* 电源控制5 */
+			frmctr1 = [05 3c 3c]; /* 帧率控制1 */
+			frmctr2 = [05 3c 3c]; /* 帧率控制2 */
+			frmctr3 = [05 3c 3c 05 3c 3c]; /* 帧率控制3 */
+			invctr = <0x03>;      /* Dot inversion */
+			gamctrp1 = [13 1e 0f 14 28 21 1a 1e 1e 20 2a 38 00 0c 01 10];  /* 正伽马 */
+			gamctrn1 = [16 1c 0e 17 30 2b 26 2b 2b 27 2f 3c 00 0e 04 10];  /* 负伽马 */
+		};
 	};
 
 };
@@ -162,7 +222,7 @@
 	status = "disabled";
 };
 
-/* 配置 LTE 模块使用的串口引脚 P2.00, P2.01 */
+/* 各外设 pinctrl 引脚配置 */
 &pinctrl {
 	i2c21_default: i2c21_default {
 		group1 {
@@ -246,6 +306,23 @@
 			low-power-enable;
 		};
 	};
+
+	spi00_default: spi00_default {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 2, 1)>,
+					<NRF_PSEL(SPIM_MOSI, 2, 2)>;
+			nordic,drive-mode = <NRF_DRIVE_H0H1>;
+			bias-disable;
+		};
+	};
+
+	spi00_sleep: spi00_sleep {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 2, 1)>,
+					<NRF_PSEL(SPIM_MOSI, 2, 2)>;
+			low-power-enable;
+		};
+	};
 };
 
 /* 开启并配置 UART30 */
@@ -265,7 +342,7 @@
     pinctrl-names = "default", "sleep";
 };
 
-/* 开启并配置 PWM 用于蜂鸣器 */
+/* 开启并配置 PWM20 用于 LCD 背光 */
 &pwm20 {
 	status = "okay";
 	pinctrl-0 = <&pwm20_default>;
@@ -282,7 +359,7 @@
 	clock-frequency = <I2C_BITRATE_STANDARD>;
 };
 
-/* 温湿度传感器 I2C 总线：P1.08(SCL), P1.07(SDA) */
+/* 气压计 I2C 总线：P1.08(SCL), P1.07(SDA) */
 &i2c22 {
 	status = "okay";
 	pinctrl-0 = <&i2c22_default>;
@@ -308,9 +385,14 @@
 	};
 };
 
-/* disable spi nor flash */
+/* LCD 显示屏使用 SPIM00：SCK=P2.01，MOSI=P2.02，CS=P2.05（无 MISO） */
 &spi00 {
-	status = "disabled";
+	compatible = "nordic,nrf-spim";
+	status = "okay";
+	pinctrl-0 = <&spi00_default>;
+	pinctrl-1 = <&spi00_sleep>;
+	pinctrl-names = "default", "sleep";
+	cs-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;  /* P2.05 CS */
 };
 
 /* Disable MX25R64 SPI NOR Flash */
@@ -327,7 +409,7 @@
 /* 新增：为 gpio1 启用 sense 机制，降低功耗 */
 &gpio1 {
 	status = "okay";
-	sense-edge-mask = <(BIT(2) | BIT(9))>;  /* P1.2 和 P1.9 */
+	sense-edge-mask = <(BIT(2) | BIT(9) | BIT(10) | BIT(11))>;  /* P1.2六轴INT、P1.9功能键、P1.10 SOS键、P1.11库仑计INT */
 };
 
 &wdt31 {

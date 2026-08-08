@@ -57,7 +57,6 @@ static int jatag_cmd_handler(at_cmd_t* msg);
 static int jgtag_cmd_handler(at_cmd_t* msg);
 static int taginit_param_cmd_handler(at_cmd_t* msg);
 static int led_cmd_handler(at_cmd_t* msg);
-static int buzzer_cmd_handler(at_cmd_t* msg);
 static int btlog_cmd_handler(at_cmd_t* msg);
 static int version_cmd_handler(at_cmd_t* msg);
 static int bt_parmac_cmd_handler(at_cmd_t* msg);
@@ -84,7 +83,6 @@ static const at_cmd_attr_t at_cmd_attr_table[] =
     {"JGTAG",          jgtag_cmd_handler},
     {"TAGINIT_PARAM",  taginit_param_cmd_handler},
     {"LED",            led_cmd_handler},
-    {"BUZZER",         buzzer_cmd_handler},
     {"BTLOG",          btlog_cmd_handler},
     {"VERSION",        version_cmd_handler},
     {"BT_PARMAC",      bt_parmac_cmd_handler},
@@ -1959,83 +1957,6 @@ static int version_cmd_handler(at_cmd_t* msg)
     return BLE_DATA_TYPE_PACKET_MULTIPLE;  // 返回 BLE 数据类型
 }
 
-/********************************************************************
-**函数名称:  buzzer_cmd_handler
-**入口参数:  msg      ---        AT指令结构体指针
-**出口参数:  msg->resp_msg  ---  响应消息
-**           msg->resp_length --- 响应长度
-**函数功能:  处理BUZZER指令：直接控制设备蜂鸣器的不同提示音模式
-**指令格式:  BUZZER,[Operater]#
-**参数说明:  Operater - 蜂鸣器操作
-**           0：停止蜂鸣器
-**           1：持续报警(200ms ON，500ms OFF，不停止)
-**           2：成功提示音(500ms ON)
-**           3：失败提示音(200ms ON，200ms OFF，响3声)
-**           4：异常提示音(100ms ON，100ms OFF，持续1s)
-**           5：一般报警音(200ms ON，300ms OFF，持续30s)
-**返 回 值:  BLE数据类型
-*********************************************************************/
-static int buzzer_cmd_handler(at_cmd_t* msg)
-{
-    uint16_t remaining;
-    uint8_t no_count = 0;
-    int operator_value;
-
-    remaining = RESP_STRING_LENGTH_MAX;
-
-    // 无参数即查询
-    if (msg->parm_count == 0)
-    {
-        msg->resp_length = snprintf(msg->resp_msg, remaining, "%s:%d",
-                                    msg->parm[0],
-                                    gConfigParam.buzzer_config.buzzer_operator
-        );
-        return BLE_DATA_TYPE_PACKET_MULTIPLE;
-    }
-
-    /* 检查参数数量 */
-    if (msg->parm_count != 1)
-    {
-        LOG_INF("%s=>%s, param count error: %d", __func__, msg->parm[0], msg->parm_count);
-        goto param_invalid;
-    }
-
-    no_count = string_check_is_number(0, msg->parm[1]);
-    if (no_count == 0 || no_count > 9)
-    {
-        LOG_INF("%s=>invalid Operater param: %s", __func__, msg->parm[1]);
-        goto param_invalid;
-    }
-    /* 解析Operater参数 */
-    operator_value = atoi(msg->parm[1]);
-    if (operator_value < 0 || operator_value > 5)
-    {
-        LOG_INF("%s=>invalid Operater param: %s", __func__, msg->parm[1]);
-        goto param_invalid;
-    }
-
-    /* 所有参数验证通过,统一赋值 */
-    gConfigParam.buzzer_config.flag = FLAG_VALID;
-    gConfigParam.buzzer_config.buzzer_operator = (uint8_t)operator_value;
-
-    /* 保存配置 */
-    my_user_data_write(ZMS_ID_BUZZER_CONFIG, &gConfigParam.buzzer_config, sizeof(buzzer_config_t));
-
-    LOG_INF("%s=>%s,%s", __func__, msg->parm[0], msg->parm[1]);
-
-    /* 生成成功响应 */
-    msg->resp_length = snprintf(msg->resp_msg, remaining, "Set OK!");
-    LOG_INF("BUZZER: Operator=%d", gConfigParam.buzzer_config.buzzer_operator);
-
-    //TODO 具体逻辑处理
-    my_set_buzzer_mode(operator_value);
-
-    return BLE_DATA_TYPE_PACKET_MULTIPLE;
-
-param_invalid:
-    msg->resp_length = snprintf(msg->resp_msg, remaining, "Set Fail! InvalidParam");
-    return BLE_DATA_TYPE_PACKET_MULTIPLE;
-}
 
 /********************************************************************
 **函数名称:  bt_parmac_cmd_handler

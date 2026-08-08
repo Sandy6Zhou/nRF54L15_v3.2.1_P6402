@@ -66,7 +66,7 @@ LOG_MODULE_REGISTER(my_battery, LOG_LEVEL_INF);
 /* 通道 0：电池电压 */
 static const struct adc_dt_spec batt_adc = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 0);
 
-static const struct gpio_dt_spec batt_pwr_en = GPIO_DT_SPEC_GET(DT_ALIAS(batt_pwr_ctrl), gpios);
+static const struct gpio_dt_spec charge_pwr_en = GPIO_DT_SPEC_GET(DT_ALIAS(charge_pwr_ctrl), gpios);
 static const struct gpio_dt_spec charge_det = GPIO_DT_SPEC_GET(DT_ALIAS(charge_detect), gpios);
 
 static struct gpio_callback s_batt_gpio_cb;
@@ -193,9 +193,9 @@ int batt_adc_init(void)
 }
 
 /* 充电使能：true=打开，false=关闭 */
-void batt_enable(bool on)
+void charge_enable(bool on)
 {
-    gpio_pin_set_dt(&batt_pwr_en, on ? 1 : 0);
+    gpio_pin_set_dt(&charge_pwr_en, on ? 1 : 0);
 }
 
 /*********************************************************************
@@ -398,7 +398,7 @@ void my_battery_show_chgled()
     else
     {
         g_charg_state = NO_CHARGING;  // 设置充电状态为未充电
-        batt_enable(true);  // 充电使能
+        charge_enable(true);  // 充电使能
         led_set_mode(CHG_LED_MODE, false);
         LOG_INF("The charger is not plugged in.");
     }
@@ -462,7 +462,7 @@ void batt_update_timer_handler(struct k_timer *timer)
     // 消除充电电压对电池电压抬高效应的影响。在采集电池电压输出高1s关闭充电路径，采集完毕输出低打开供电路径
     if (s_batt_disable_flag == true && s_chg_batt_state > CHG_BATT_FAIR)
     {
-        batt_enable(false);  // 禁用充电使能
+        charge_enable(false);  // 禁用充电使能
     }
 
     // 发送电池状态更新消息到控制模块
@@ -473,17 +473,17 @@ int batt_gpio_init(void)
 {
     int ret;
 
-    if (!device_is_ready(batt_pwr_en.port) ||
+    if (!device_is_ready(charge_pwr_en.port) ||
         !device_is_ready(charge_det.port))
     {
         return -ENODEV;
     }
 
     /* 使能口：输出，默认打开 */
-    ret = gpio_pin_configure_dt(&batt_pwr_en, GPIO_OUTPUT_ACTIVE);
+    ret = gpio_pin_configure_dt(&charge_pwr_en, GPIO_OUTPUT_ACTIVE);
     if (ret) return ret;
 
-    gpio_pin_set_dt(&batt_pwr_en, 0);
+    gpio_pin_set_dt(&charge_pwr_en, 0);
 
     /* 充电检测：输入（上拉在 DTS 里已经配置） */
     ret = gpio_pin_configure_dt(&charge_det, GPIO_INPUT);
@@ -814,7 +814,7 @@ void my_battery_update_state()
             s_chg_batt_state = CHG_BATT_FULL;  // 充电电量满
         }
 
-        batt_enable(true);  // 电池采样完成后恢复充电使能
+        charge_enable(true);  // 电池采样完成后恢复充电使能
 
         //TODO 后续应该更改为库仑计计算
         if (s_show_percent >= 100 && g_charg_state != CHARG_FULL)

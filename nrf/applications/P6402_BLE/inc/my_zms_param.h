@@ -63,7 +63,6 @@ typedef enum                           // 参数ID定义
     ZMS_ID_BTCONNECT_CONFIG,           // 蓝牙连接配置参数ID
     ZMS_ID_TAG_CONFIG,                 // Tag定位功能配置参数ID
     ZMS_ID_LED_CONFIG,                 // LED显示配置参数ID
-    ZMS_ID_BUZZER_CONFIG,              // 蜂鸣器配置参数ID
     ZMS_ID_BT_PARMAC_CONFIG,           // 透传MAC地址配置参数ID
     ZMS_ID_BLE_TAG_STORE_META,         // BLE TAG扫描数据循环存储区元数据ID
     ZMS_ID_BLE_MAC_STORE_META,         // BLE 透传MAC扫描数据循环存储区元数据ID
@@ -182,12 +181,6 @@ typedef struct                              // 存储的LED显示配置参数
     uint8_t led_display;                    // LED显示模式: 0-一直关闭, 1-按键显示, 2-全时显示
 } led_config_t;
 
-typedef struct                              // 存储的蜂鸣器配置参数
-{
-    uint8_t flag;                           // 参数有效标志
-    uint8_t buzzer_operator;                // 蜂鸣器操作: 0-停止, 1-持续报警, 2-成功提示音, 3-失败提示音, 4-异常提示音, 5-一般报警音
-} buzzer_config_t;
-
 typedef struct                              // 存储的透传mac地址配置数据
 {
     uint8_t flag;                                   // 参数有效标志
@@ -222,7 +215,6 @@ typedef struct
     btconnect_config_t          btconnect_config;           // 蓝牙连接配置
     tag_config_t                tag_config;                 // Tag定位功能配置
     led_config_t                led_config;                 // LED显示配置
-    buzzer_config_t             buzzer_config;              // 蜂鸣器配置
     bparmac_config_t            bparmac_config;             // 透传mac地址配置
     patm_timer_config_t         patm_timer_config;          // 气压定时上传配置
 } config_param_t;

@@ -150,12 +150,6 @@ const led_config_t gDefaultLedConfig =
     .led_display = 1,                  /* 默认模式1 */
 };
 
-const buzzer_config_t gDefaultBuzzerConfig =
-{
-    .flag = FLAG_VALID,
-    .buzzer_operator = 0,             /* 默认停止 */
-};
-
 const bparmac_config_t gDefaultBparmacConfig =
 {
     .flag = FLAG_VALID,
@@ -488,19 +482,6 @@ void my_param_load_config(void)
         MY_LOG_INF("Led config loaded: led_display(%d)", gConfigParam.led_config.led_display);
     }
 
-
-    //--------Load Buzzer Config ---------------------
-    length = sizeof(buzzer_config_t);
-    ret = my_user_data_read(ZMS_ID_BUZZER_CONFIG, &gConfigParam.buzzer_config, length);
-    if (gConfigParam.buzzer_config.flag != FLAG_VALID || ret != length)
-    {
-        memcpy(&gConfigParam.buzzer_config, &gDefaultBuzzerConfig, length);
-        MY_LOG_INF("Buzzer config not found. Use default:buzzer_operator(%d)", gConfigParam.buzzer_config.buzzer_operator);
-    }
-    else
-    {
-        MY_LOG_INF("Buzzer config loaded: buzzer_operator(%d)", gConfigParam.buzzer_config.buzzer_operator);
-    }
 
     //--------Load Bparmac Config ---------------------
     length = sizeof(bparmac_config_t);

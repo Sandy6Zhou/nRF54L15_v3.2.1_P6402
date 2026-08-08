@@ -470,37 +470,6 @@ static int cmd_ble_log_config(const struct shell *shell, size_t argc, char **arg
 }
 
 /********************************************************************
-**函数名称:  cmd_buzzer_test
-**入口参数:  sh    ---        Shell句柄，用于输出信息
-            argc  ---        参数个数
-            argv  ---        参数数组，argv[1]为测试参数字符串
-**出口参数:  无
-**函数功能:  处理Buzzer测试命令，接收参数并发送测试消息到Buzzer模块
-**返 回 值:  0表示成功
-*********************************************************************/
-static int cmd_buzzer_test(const struct shell *sh, size_t argc, char **argv)
-{
-    int len;
-
-    if (argc < 2)
-    {
-        shell_error(sh, "Missing parameter");
-        return -EINVAL;
-    }
-
-    memset(g_shell_test_buff, 0, sizeof(g_shell_test_buff));
-
-    len = strlen(argv[1]);
-    memcpy(g_shell_test_buff, argv[1], len);
-    g_shell_test_buff[len] = 0;
-
-    shell_print(sh, "param: %s, len: %d", argv[1], len);
-    my_set_buzzer_mode(atoi(argv[1]));
-
-    return 0;
-}
-
-/********************************************************************
 **函数名称:  cmd_retransmit_check_test
 **入口参数:  sh    ---   Shell 实例句柄
 **           argc  ---   参数个数
@@ -573,7 +542,7 @@ static int cmd_hardware_test(const struct shell *sh, size_t argc, char **argv)
         //v_chg_en 0/1      (充电电路关/开)
         mode = atoi(argv[2]);
 
-        batt_enable(mode);
+        charge_enable(mode);
     }
     // 4G电源使能测试
     else if (strcmp(argv[1], "4GPOWER") == 0)
@@ -648,7 +617,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_app,
     SHELL_CMD(shutdown, NULL, "Shutdown system (enter ultra-low power mode)", cmd_shutdown),
     SHELL_CMD(blog, NULL, "Send BLE log test message: app blog <message>", cmd_ble_log_test),
     SHELL_CMD(blogcfg, NULL, "BLE log config: app blogcfg <global|mod|level|show>", cmd_ble_log_config),
-    SHELL_CMD(buzzer_test, NULL, "Run Buzzer test", cmd_buzzer_test),
     SHELL_CMD(retransmit_check_test, NULL, "Run retransmit_check_test test", cmd_retransmit_check_test),
     SHELL_CMD(hardware_test, NULL, "Run hardware test", cmd_hardware_test),
     SHELL_CMD(read_gsensor_data, NULL, "Read G-Sensor data", cmd_read_gsensor_data),

@@ -69,7 +69,7 @@ extern my_chg_state_t g_charg_state;
 int batt_read_mv(int32_t *mv);
 int ntc_read_raw(int16_t *raw);
 int batt_adc_init(void);
-void batt_enable(bool on);
+void charge_enable(bool on);
 int batt_gpio_init(void);
 
 /*********************************************************************
