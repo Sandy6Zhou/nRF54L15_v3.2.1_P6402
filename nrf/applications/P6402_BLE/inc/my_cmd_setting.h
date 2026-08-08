@@ -70,30 +70,6 @@ extern char g_resp_buf[RESP_STRING_LENGTH_MAX];
 extern bool g_factory_mode;
 
 /********************************************************************
-**函数名称:  set_long_battery_params
-**入口参数:  config              ---    指向设备工作模式配置结构体的指针
-**           reporting_interval   ---    上报间隔时间（单位：分钟，5~1440）
-**           start_time_str      ---    启动时间字符串（格式：HHMM）
-**           gnss_sw             ---    GNSS开关（1=ON, 0=OFF）
-**出口参数:  config              ---    更新后的长续航模式配置结构体
-**函数功能:  设置长续航模式的工作参数，包括上报间隔、启动时间和GNSS开关
-**返 回 值:  0 表示成功，负值表示失败（如时间格式错误等）
-*********************************************************************/
-int set_long_battery_params(device_work_mode_config_t *config, uint16_t reporting_interval, const char *start_time_str, uint8_t gnss_sw);
-
-/********************************************************************
-**函数名称:  set_intelligent_params
-**入口参数:  config     ---    指向设备工作模式配置结构体的指针
-**           sub_mode   ---    子模式（0~5），控制Cell/GNSS休眠策略
-**           static_int ---    静止状态上报间隔（原始值，单位由子模式决定）
-**           moving_int ---    运动状态上报间隔（原始值，单位由子模式决定）
-**出口参数:  config     ---    更新后的智能模式配置结构体
-**函数功能:  设置智能模式的工作参数，根据子模式配置静止/运动上报间隔
-**返 回 值:  0 表示成功，负值表示失败（如参数非法等）
-*********************************************************************/
-int set_intelligent_params(device_work_mode_config_t *config, uint8_t sub_mode, uint32_t static_int, uint32_t moving_int);
-
-/********************************************************************
 **函数名称:  at_recv_cmd_handler
 **入口参数:  at_cmd_msg      ---        AT指令结构体指针，包含接收的指令和响应存储区域(输入/输出)
 **出口参数:  at_cmd_msg中更新响应消息内容和响应长度

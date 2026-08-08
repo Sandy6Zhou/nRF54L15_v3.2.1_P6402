@@ -12,7 +12,19 @@
 #ifndef _MY_VERSION_H_
 #define _MY_VERSION_H_
 
-#define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260731"
+#define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260803"
+/* 软件版本:        V1.0
+** 完成日期:        2026.08.03
+** 作    者:       周森达 (zhousenda@jimiiot.com)
+** 修改内容:        固件精简重构与IMU驱动替换
+**                 1.六轴IMU驱动由BMI325切换为QMI8658B，重写G-Sensor模块，删除姿态解算算法(my_gsensor_algorithm);
+**                 2.移除设备工作模式(连续/长续航/智能/常在线)及低功耗运行(LPSLEEP)功能;
+**                 3.移除温湿度、光感拆壳/拆卸检测及气压/温湿度/运动/翻转报警功能;
+**                 4.精简参数存储：删除约15个废弃配置项，气压Flash存储区扩展至100KB;
+**                 5.清理废弃AT指令与shell调试命令;
+***/
+
+// #define SOFTWARE_VERSION "P6402_NRF54L15_V1.0_260731"
 /* 软件版本:        V1.0
 ** 完成日期:        2026.07.31
 ** 作    者:       周森达 (zhousenda@jimiiot.com)

@@ -23,8 +23,7 @@ LOG_MODULE_REGISTER(my_flash_store, LOG_LEVEL_INF);
 #define FS_TOTAL_SECTORS        50U                     // 数据区总扇区数(200KB/4KB)
 #define FS_TAG_REGION_SECTORS   12U                     // TAG区扇区数(48KB)
 #define FS_MAC_REGION_SECTORS   13U                     // MAC区扇区数(52KB)
-#define FS_TH_REGION_SECTORS    12U                     // 温湿度区扇区数(48KB)
-#define FS_BP_REGION_SECTORS    13U                     // 气压区扇区数(52KB)
+#define FS_BP_REGION_SECTORS    25U                     // 气压区扇区数(100KB)
 #define FS_SECTOR_HEADER_SIZE   16U                     // 扇区头大小
 #define FS_SECTOR_MAGIC         0x424C4453U             // 扇区头魔数 'BLDS':BLE Data Store（BLE数据存储）的缩写
 #define FS_REC_MAGIC            0xA5U                   // 记录有效标记
@@ -33,19 +32,16 @@ LOG_MODULE_REGISTER(my_flash_store, LOG_LEVEL_INF);
 /* 各区扇区基址(分区内相对扇区索引) */
 #define FS_TAG_SECTOR_BASE      0U
 #define FS_MAC_SECTOR_BASE      (FS_TAG_SECTOR_BASE + FS_TAG_REGION_SECTORS)
-#define FS_TH_SECTOR_BASE       (FS_MAC_SECTOR_BASE + FS_MAC_REGION_SECTORS)
-#define FS_BP_SECTOR_BASE       (FS_TH_SECTOR_BASE + FS_TH_REGION_SECTORS)
+#define FS_BP_SECTOR_BASE       (FS_MAC_SECTOR_BASE + FS_MAC_REGION_SECTORS)
 
-/* 记录槽大小：TAG=92+4=96，MAC=1+3+44=48，TH/BP=8+4=12 */
+/* 记录槽大小：TAG=92+4=96，MAC=1+3+44=48，BP=8+4=12 */
 #define FS_TAG_REC_SIZE         96U
 #define FS_MAC_REC_SIZE         48U
-#define FS_TH_REC_SIZE          12U
 #define FS_BP_REC_SIZE          12U
 
 /* 每扇区记录条数 */
 #define FS_TAG_REC_PER_SECTOR   ((FS_SECTOR_SIZE - FS_SECTOR_HEADER_SIZE) / FS_TAG_REC_SIZE)
 #define FS_MAC_REC_PER_SECTOR   ((FS_SECTOR_SIZE - FS_SECTOR_HEADER_SIZE) / FS_MAC_REC_SIZE)
-#define FS_TH_REC_PER_SECTOR    ((FS_SECTOR_SIZE - FS_SECTOR_HEADER_SIZE) / FS_TH_REC_SIZE)
 #define FS_BP_REC_PER_SECTOR    ((FS_SECTOR_SIZE - FS_SECTOR_HEADER_SIZE) / FS_BP_REC_SIZE)
 
 /* ========== 磁盘结构定义 ========== */
@@ -74,13 +70,6 @@ typedef struct
     uint8_t pad[3];             // 填充对齐(使data落在4字节边界，满足timestamp等4字节成员对齐)
     tran_mac_result_item_t data;// 透传MAC结果(44字节)
 } fs_mac_record_t;
-
-typedef struct
-{
-    uint8_t magic;                  // 记录有效标记 FS_REC_MAGIC
-    uint8_t pad[3];                 // 填充对齐，使data按4字节边界存放
-    fs_temp_humi_record_t data;     // 温湿度记录数据
-} fs_th_record_t;
 
 typedef struct
 {
@@ -136,7 +125,6 @@ static bool s_inited;                           // 初始化标志
 /* 四区RAM暂存缓冲(各容纳一扇区可装的记录数，不含扇区头) */
 static fs_tag_record_t s_tag_staging[FS_TAG_REC_PER_SECTOR];
 static fs_mac_record_t s_mac_staging[FS_MAC_REC_PER_SECTOR];
-static fs_th_record_t s_th_staging[FS_TH_REC_PER_SECTOR];
 static fs_bp_record_t s_bp_staging[FS_BP_REC_PER_SECTOR];
 
 /* 整扇区落盘组装缓冲(BLE线程串行调用，静态共用以避免BLE线程栈占用) */
@@ -446,7 +434,6 @@ int my_flash_store_init(void)
 {
     fs_region_t *tag_rg;
     fs_region_t *mac_rg;
-    fs_region_t *th_rg;
     fs_region_t *bp_rg;
     int err;
 
@@ -458,12 +445,10 @@ int my_flash_store_init(void)
     // 编译期保证记录槽大小与每扇区记录数符合预期
     BUILD_ASSERT(sizeof(fs_tag_record_t) == FS_TAG_REC_SIZE, "TAG record size mismatch");
     BUILD_ASSERT(sizeof(fs_mac_record_t) == FS_MAC_REC_SIZE, "MAC record size mismatch");
-    BUILD_ASSERT(sizeof(fs_th_record_t) == FS_TH_REC_SIZE, "TH record size mismatch");
     BUILD_ASSERT(sizeof(fs_bp_record_t) == FS_BP_REC_SIZE, "BP record size mismatch");
     BUILD_ASSERT(sizeof(fs_sector_header_t) == FS_SECTOR_HEADER_SIZE, "sector header size mismatch");
     BUILD_ASSERT(FS_TAG_SECTOR_BASE + FS_TAG_REGION_SECTORS == FS_MAC_SECTOR_BASE, "TAG region overlaps MAC");
-    BUILD_ASSERT(FS_MAC_SECTOR_BASE + FS_MAC_REGION_SECTORS == FS_TH_SECTOR_BASE, "MAC region overlaps TH");
-    BUILD_ASSERT(FS_TH_SECTOR_BASE + FS_TH_REGION_SECTORS == FS_BP_SECTOR_BASE, "TH region overlaps BP");
+    BUILD_ASSERT(FS_MAC_SECTOR_BASE + FS_MAC_REGION_SECTORS == FS_BP_SECTOR_BASE, "MAC region overlaps BP");
     BUILD_ASSERT(FS_BP_SECTOR_BASE + FS_BP_REGION_SECTORS == FS_TOTAL_SECTORS, "region layout overflow");
 
     // 打开数据分区
@@ -502,15 +487,6 @@ int my_flash_store_init(void)
     mac_rg->zms_id = ZMS_ID_BLE_MAC_STORE_META;
     mac_rg->staging_buf = (uint8_t *)s_mac_staging;
 
-    th_rg = &s_region[FS_TYPE_TH];
-    memset(th_rg, 0, sizeof(fs_region_t));
-    th_rg->sector_base = FS_TH_SECTOR_BASE;
-    th_rg->rec_size = FS_TH_REC_SIZE;
-    th_rg->rec_per_sector = FS_TH_REC_PER_SECTOR;
-    th_rg->region_sectors = FS_TH_REGION_SECTORS;
-    th_rg->zms_id = ZMS_ID_BLE_TH_STORE_META;
-    th_rg->staging_buf = (uint8_t *)s_th_staging;
-
     bp_rg = &s_region[FS_TYPE_BP];
     memset(bp_rg, 0, sizeof(fs_region_t));
     bp_rg->sector_base = FS_BP_SECTOR_BASE;
@@ -523,13 +499,12 @@ int my_flash_store_init(void)
     // 从ZMS加载并恢复各区的读写指针
     fs_region_load(tag_rg);
     fs_region_load(mac_rg);
-    fs_region_load(th_rg);
     fs_region_load(bp_rg);
 
     s_inited = true;
-    LOG_INF("flash store init ok: TAG %d, MAC %d, TH %d, BP %d rec/sector",
+    LOG_INF("flash store init ok: TAG %d, MAC %d, BP %d rec/sector",
             FS_TAG_REC_PER_SECTOR, FS_MAC_REC_PER_SECTOR,
-            FS_TH_REC_PER_SECTOR, FS_BP_REC_PER_SECTOR);
+            FS_BP_REC_PER_SECTOR);
     return 0;
 }
 
@@ -565,23 +540,6 @@ int my_flash_store_push_mac(const tran_mac_result_item_t *rec_ptr)
     }
 
     return fs_region_push(&s_region[FS_TYPE_MAC], rec_ptr, sizeof(tran_mac_result_item_t));
-}
-
-/********************************************************************
-**函数名称:  my_flash_store_push_th
-**入口参数:  rec_ptr   ---        待存储的温湿度记录指针（输入）
-**出口参数:  无
-**函数功能:  追加一条温湿度记录到TH区暂存缓冲，攒满一整扇区就写入FLASH
-**返 回 值:  0表示成功，负值表示失败
-*********************************************************************/
-int my_flash_store_push_th(const fs_temp_humi_record_t *rec_ptr)
-{
-    if (!s_inited || rec_ptr == NULL)
-    {
-        return -EINVAL;
-    }
-
-    return fs_region_push(&s_region[FS_TYPE_TH], rec_ptr, sizeof(fs_temp_humi_record_t));
 }
 
 /********************************************************************
@@ -669,10 +627,6 @@ int my_flash_store_read_next(fs_data_type_t type, void *out_rec_ptr)
 
         case FS_TYPE_MAC:
             data_len = sizeof(tran_mac_result_item_t);
-            break;
-
-        case FS_TYPE_TH:
-            data_len = sizeof(fs_temp_humi_record_t);
             break;
 
         case FS_TYPE_BP:

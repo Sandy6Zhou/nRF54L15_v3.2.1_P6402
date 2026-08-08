@@ -116,20 +116,8 @@ typedef enum
     ALARM_CHARGE_OUT,           // 充电器拔出告警
     ALARM_CHARGE_FULL,          // 充满状态告警
     ALARM_BAT_SWITCH,           // 电量状态切换告警
-    ALARM_REMOVE,               // 拆卸告警
-    ALARM_CASE_OPEN,            // 拆壳告警
-    ALARM_MOVE_START,           // 开始运动告警
-    ALARM_MOVE_STOP,            // 停止运动告警
     ALARM_BLE_CONNECTED,        // 蓝牙连接成功告警
     ALARM_BLE_CONNECT_ERR,      // 蓝牙连接异常告警
-    ALARM_HIGH_PATM,            // 高压告警
-    ALARM_LOW_PATM,             // 低压告警
-    ALARM_HIGH_TEMP,            // 高温告警
-    ALARM_LOW_TEMP,             // 低温告警
-    ALARM_HIGH_HUMI,            // 高湿告警
-    ALARM_LOW_HUMI,             // 低湿告警
-    ALARM_FILP,                 // 翻转告警
-    ALARM_FILP_BACK,            // 翻转恢复告警
     ALARM_LOW_BAT,              // 内置电池低电报警
     ALARM_OTHER,                // 其他类型告警
 } alarm_type_t;
@@ -163,10 +151,8 @@ typedef enum
     MY_TIMER_ONE_MINUTE = 0, // 最核心定时器，一分钟定时器使用
     MY_TIMER_TEST,           // 1
     MY_TIMER_WDT_FEED,       // 看门狗喂狗定时器
-    MY_TIMER_LTE_POWER,      // LTE电源控制定时器
     MY_TIMER_LTE_PULSE,       // LTE脉冲定时器
     MY_TIMER_PATM_UPLOAD,     // 气压定时上传定时器
-    MY_TIMER_TEMP_UPLOAD,     // 温湿度定时上传定时器
 
     /* 扫描定时器 */
     MY_TIMER_SCAN_INTERVAL,   // 周期扫描定时器
@@ -178,14 +164,6 @@ typedef enum
     // LED 控制定时器
     MY_TIMER_LED_ENABLE,           // LED使能定时器
     MY_TIMER_LED_BLINK,            // LED闪烁定时器
-
-    // G-Sensor 专用定时器
-    MY_TIMER_IMU_INT_DITHER,      // IMU 中断去抖定时器
-    MY_TIMER_GSENSOR_STATE_CHECK, // 运动状态检查定时器
-    MY_TIMER_GSENSOR_ALGORITHM,   // G-Sensor 算法定时器
-
-    // 低功耗运行专用定时器
-    MY_TIMER_LPSLEEP,               // 低功耗运行定时唤醒定时器
 
     MY_TIMER_MAX_ID,
 } MY_E_TIMER;
@@ -208,12 +186,10 @@ typedef enum
     MY_MSG_CTRL_BUZZER_MODE, /* 蜂鸣器控制消息 */
     MY_MSG_CTRL_BUZZER_ON,
     MY_MSG_CTRL_BUZZER_OFF,
-    MY_MSG_WORK_MODE_SWITCH,
     MY_MSG_SHOW_CHARG, // 充电状态显示LED消息
     MY_MSG_UPDATE_BATTERY, // 更新电池状态消息
 
     /* LTE处理程序消息 */
-    MY_MSG_RESET_LTE_TIMER,
     MY_MSG_LTE_UART_IDLE,
     MY_MSG_LTE_TX_DONE,
     MY_MSG_LTE_TX_ABORTED,
@@ -231,26 +207,16 @@ typedef enum
     MY_MSG_MAGNETIC_UART_SEND,
 
     /* G-Sensor处理程序消息 */
-    MY_MSG_GSENSOR_HIGH_POWER,      /* G-Sensor 模式切换进入高性能模式 */
-    MY_MSG_GSENSOR_LOW_POWER,       /* G-Sensor 模式切换进入低功耗模式 */
     MY_MSG_GSENSOR_INT,             /* G-Sensor INT1 中断消息 */
     MY_MSG_READ_GSENSOR_DATA,       /* 读取G-Sensor数据消息 */
-    MY_MSG_MOTION_CHECK,            /*检查设备运动状态*/
 
     /* CTRL处理程序消息 */
     MY_MSG_CTRL_KEY_SHORT_PRESS,       /* 按键短按事件 */
     MY_MSG_CTRL_KEY_LONG_PRESS,        /* 按键长按事件（3秒） */
-    MY_MSG_CTRL_LIGHT_TAMPER_SENSOR_DARK,     /* 拆壳光传感器检测到黑暗环境 */
-    MY_MSG_CTRL_LIGHT_TAMPER_SENSOR_BRIGHT,   /* 拆壳光传感器检测到光明环境 */
-    MY_MSG_CTRL_LIGHT_PULL_SENSOR_BRIGHT,   /* 拆卸光传感器检测到光明环境 */
-    MY_MSG_CTRL_LIGHT_PULL_SENSOR_DARK,     /* 拆卸光传感器检测到黑暗环境 */
     MY_MSG_CTRL_SHUTDOWN_REQUEST,      /* 关机请求 */
     MY_MSG_CTRL_PATM_TIMER,            /* 气压定时上传触发消息 */
-    MY_MSG_CTRL_TEMP_TIMER,            /* 温湿度定时上传触发消息 */
     MY_MSG_CTRL_PATM_RELOAD,           /* 气压定时器配置更新消息 */
-    MY_MSG_CTRL_TEMP_RELOAD,           /* 温湿度定时器配置更新消息 */
     MY_MSG_CTRL_PATM_READ,             /* 读取气压数据消息 */
-    MY_MSG_CTRL_TEMP_READ,             /* 读取温度湿度数据消息 */
     MY_MSG_CTRL_STATUS_READ,           /* 读取状态信息消息 */
     MY_MSG_LED_CTRL_MODE,              /* LED 控制 */
     MY_MSG_LED_ENABLE,                 /* LED使能 */
@@ -261,7 +227,6 @@ typedef enum
     MY_MSG_BLE_TX,                  /* 向蓝牙发送消息 */
     MY_MSG_BLE_OPEN_ADV,            /* 开启可连接广播 */
     MY_MSG_BLE_CLOSE_ADV,           /* 关闭可连接广播 */
-    MY_MSG_BLE_SENSOR_TH_SAMPLE,    /* 温湿度采样结果消息 */
     MY_MSG_BLE_SENSOR_BP_SAMPLE,    /* 气压采样结果消息 */
     MY_MSG_BLE_SENSOR_LTE_ACK,      /* LTE异步应答转发给BLE */
 
@@ -290,15 +255,6 @@ typedef enum
     MY_MSG_SCAN_UPLOAD,         /* 上报间隔定时器消息 */
     MY_MSG_UPLOAD_WAKEUP,       /* LTE就绪后触发BLE统一调度扫描与传感器缓存上报 */
     MY_MSG_LTE_WAKEUP,          /* LTE唤醒引脚中断触发的UART恢复消息 */
-    MY_MSG_SCAN_LPSLEEP_ENTER,  /* 扫描进入低功耗运行消息 */
-    MY_MSG_SCAN_LPSLEEP_EXIT,   /* 扫描退出低功耗运行消息 */
-
-    /* 低功耗运行处理程序消息 */
-    MY_MSG_LPSLEEP_ENTER,            /* 进入低功耗运行消息 */
-    MY_MSG_LPSLEEP_EXIT,             /* 退出低功耗运行消息 */
-    MY_MSG_LPSLEEP_BATTERY_CHECK,    /* 电量变化触发的低功耗运行状态检查消息 */
-    MY_MSG_LPSLEEP_LTE_SYNC,         /* LTE上电完成后的低功耗运行状态同步消息 */
-    MY_MSG_LPSLEEP_CLEAR_HOLD_OFF,   /* 清除低功耗运行暂缓标志消息 */
 } MY_MAIN_TASK_MSG;
 
 /* ========== 集中引用所有模块头文件 ========== */
@@ -310,7 +266,6 @@ typedef enum
 #include "my_lte.h"
 #include "my_magnetic_uart.h"
 #include "my_gsensor.h"
-#include "my_gsensor_algorithm.h"
 #include "my_battery.h"
 #include "my_wdt.h"
 #include "my_tool.h"

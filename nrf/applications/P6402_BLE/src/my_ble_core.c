@@ -1347,7 +1347,6 @@ static void my_ble_task(void *p1, void *p2, void *p3)
             case MY_MSG_SCAN_UPLOAD:
             case MY_MSG_UPLOAD_WAKEUP:
             case MY_MSG_TRAN_MAC_PROCESS:
-            case MY_MSG_BLE_SENSOR_TH_SAMPLE:
             case MY_MSG_BLE_SENSOR_BP_SAMPLE:
             case MY_MSG_BLE_SENSOR_LTE_ACK:
                 my_scan_msg_handler(&msg);
@@ -1386,19 +1385,6 @@ static void my_ble_task(void *p1, void *p2, void *p3)
                 start_adv(&s_con_adv_obj_hdl, false);
                 led_set_mode(BT_RADIO_LED_MODE, false);
                 my_stop_timer(MY_TIMER_BLUETOOTH_ADV);
-                break;
-
-            case MY_MSG_SCAN_LPSLEEP_ENTER:  /* 扫描进入低功耗运行消息 */
-                my_scan_set_config(0, gConfigParam.bt_updata_config.bt_updata_scan_interval,
-                                    gConfigParam.bt_updata_config.bt_updata_scan_length,
-                                    gConfigParam.bt_updata_config.bt_updata_updata_interval);
-                break;
-
-            case MY_MSG_SCAN_LPSLEEP_EXIT:  /* 扫描退出低功耗运行消息 */
-                my_scan_set_config(gConfigParam.bt_updata_config.bt_updata_mode,
-                                    gConfigParam.bt_updata_config.bt_updata_scan_interval,
-                                    gConfigParam.bt_updata_config.bt_updata_scan_length,
-                                    gConfigParam.bt_updata_config.bt_updata_updata_interval);
                 break;
 
             default:

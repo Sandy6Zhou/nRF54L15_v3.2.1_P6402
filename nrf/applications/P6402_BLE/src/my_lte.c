@@ -126,10 +126,8 @@ static const ble_rsp_cmd_map_t ble_rsp_cmd_table[] = {
     {"OTA",      BLE_RSP_OTA     },
     {"INFO",     BLE_RSP_INFO    },
     {"MACINFO",  BLE_RSP_MACINFO },
-    {"WMODE",    BLE_RSP_WMODE },
     {"PWROFF",   BLE_RSP_PWROFF },
     {"PULSE",    BLE_RSP_PULSE },
-    {"TH",       BLE_RSP_TH},
     {"BP",       BLE_RSP_BP},
     {"CDATA",    BLE_RSP_CDATA},
     {"FACTORY",  BLE_RSP_FACTORY},
@@ -2025,12 +2023,6 @@ static int my_lte_handle_power_on(char *data)
 
     my_lte_send_msg(resp_buf, (uint16_t)nRespLen);
 
-    // 发送当前工作模式给LTE模块
-    send_work_mode_command(gConfigParam.device_workmode_config.workmode_config.current_mode);
-
-    // 低功耗运行状态同步统一交由main线程串行处理
-    my_send_msg(MOD_LTE, MOD_MAIN, MY_MSG_LPSLEEP_LTE_SYNC);
-
     // LTE启动并返回OK后，通知BLE线程统一调度TAG/MAC与TH/BP缓存上报
     my_send_msg(MOD_LTE, MOD_BLE, MY_MSG_UPLOAD_WAKEUP);
     // 发送蓝牙信息给LTE模块
@@ -2073,7 +2065,6 @@ static int my_lte_handle_power_off(char *data)
     if (g_factory_mode == true)
     {
         g_factory_mode = false;
-        my_gsensor_save_imu_bias();
         k_sleep(K_MSEC(500));
         sys_reboot(SYS_REBOOT_COLD);
         return 0;
@@ -2503,7 +2494,6 @@ static int my_ble_handle(char *data)
             my_send_msg(MOD_LTE, MOD_BLE, MY_MSG_UPLOAD_TAG_AND_MAC);
             break;
 
-        case BLE_RSP_TH:
         case BLE_RSP_BP:
         case BLE_RSP_CDATA:
             memcpy(&s_sensor_ble_rsp, &rsp_result, sizeof(s_sensor_ble_rsp));
@@ -2662,7 +2652,6 @@ static int my_lte_handle_getmot(char *data)
     char result[16] = {0};
     char send_buf[30] = {0};
     uint8_t getmot_val = 0;
-    gsensor_state_t gsensor_state = STATE_UNKNOWN;
 
     // 解析查询标志参数
     my_get_str_at_pos(data, 0, ',', result, sizeof(result));
@@ -2675,27 +2664,7 @@ static int my_lte_handle_getmot(char *data)
         return -1;
     }
 
-    // 获取当前GSensor检测的运动状态
-    gsensor_state = my_gsensor_get_state();
-
-    // 根据运动状态发送相应响应
-    switch (gsensor_state)
-    {
-        case STATE_STATIC:
-            // 设备处于静止状态
-            strncpy(result, "STATIC", sizeof("STATIC"));
-            break;
-
-        case STATE_MOTION:
-            // 设备处于运动状态
-            strncpy(result, "MOTION", sizeof("MOTION"));
-            break;
-
-        default:
-            // 未知状态，发送默认值
-            strncpy(result, "UNKNOWN", sizeof("UNKNOWN"));
-            break;
-    }
+    strncpy(result, "UNSUPPORTED", sizeof(result) - 1U);
     snprintf(send_buf, sizeof(send_buf), "LTE+GETMOT=%s\r\n", result);
     my_lte_uart_send(send_buf, strlen(send_buf));
 
